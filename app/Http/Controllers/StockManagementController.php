@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Request\StockManagementRequest;
 use App\Services\StockManagementService;
+use App\Http\Resources\StockManagementResource;
 
 class StockManagementController extends Controller
 {
@@ -18,44 +19,43 @@ class StockManagementController extends Controller
     {
         return response()->json([
             'message' => 'Item categories fetched',
-            'data' => $this->service->list()
+            'data' => StockManagementResource::collection($this->service->list())
         ]);
     }
 
     public function store(StockManagementRequest $request)
     {
-        // Service returns model instance, not ID
         $item = $this->service->create($request->validated());
 
         return response()->json([
             'message' => 'Item category created',
-            'data' => $item
+            'data' => new StockManagementResource($item)
         ]);
     }
 
-    public function show($id)
+    public function show($uuid)
     {
-        $item = $this->service->getById($id);
+        $item = $this->service->getByUuid($uuid);
 
         return response()->json([
             'message' => 'Item category fetched',
-            'data' => $item
+            'data' => new StockManagementResource($item)
         ]);
     }
 
-    public function update(StockManagementRequest $request, $id)
+    public function update(StockManagementRequest $request, $uuid)
     {
-        $item = $this->service->update($id, $request->validated());
+        $item = $this->service->updateByUuid($uuid, $request->validated());
 
         return response()->json([
             'message' => 'Item category updated',
-            'data' => $item
+            'data' => new StockManagementResource($item)
         ]);
     }
 
-    public function destroy($id)
+    public function destroy($uuid)
     {
-        $this->service->delete($id);
+        $this->service->deleteByUuid($uuid);
 
         return response()->json([
             'message' => 'Item category deleted'

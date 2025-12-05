@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('item_category', function (Blueprint $table) {
     $table->id();
+    $table->uuid('uuid')->unique();
     $table->string('code')->unique();
     $table->string('category_name');
     $table->string('category_type');

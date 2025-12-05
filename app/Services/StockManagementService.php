@@ -21,27 +21,29 @@ class StockManagementService
         });
     }
 
-    public function getById($id)
+    public function getByUuid($uuid)
     {
-        return StockManagement::where('id', $id)
+        return StockManagement::where('uuid', $uuid)
             ->whereNull('deleted_at')
-            ->first();
+            ->firstOrFail();
     }
 
-    public function update($id, array $data)
+    public function updateByUuid($uuid, array $data)
     {
-        return DB::transaction(function () use ($id, $data) {
-            $item = StockManagement::findOrFail($id);
+        return DB::transaction(function () use ($uuid, $data) {
+
+            $item = StockManagement::where('uuid', $uuid)->firstOrFail();
             $item->update($data);
 
             return $item;
         });
     }
 
-    public function delete($id)
+    public function deleteByUuid($uuid)
     {
-        return DB::transaction(function () use ($id) {
-            $item = StockManagement::findOrFail($id);
+        return DB::transaction(function () use ($uuid) {
+
+            $item = StockManagement::where('uuid', $uuid)->firstOrFail();
 
             return $item->update([
                 'deleted_at' => now()
