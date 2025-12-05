@@ -16,7 +16,6 @@ class OrderController extends Controller
     {
         $this->service = $service;
     }
-
     public function index()
     {
         $orders = $this->service->list();
