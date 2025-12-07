@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use App\Traits\ResponseTrait;
 use App\Models\User;
 
 class AuthController extends Controller
 {
+    use ResponseTrait;
     // Signup
     public function signup(Request $request)
     {
@@ -79,4 +81,30 @@ class AuthController extends Controller
             'token' => $token
         ]);
     }
+    public function logout(Request $request)
+    {
+        $token = $request->user()->currentAccessToken();
+        if ($token) {
+            $token->delete();
+        }
+        return $this->success(null, 'Logged out successfully');
+    }
+
+    public function logoutAll(Request $request)
+    {
+        $user = $request->user();
+        $user->tokens()->delete();
+        return $this->success(null, 'Logged out from all devices');
+    }
+
+    public function tokenCheck(Request $request)
+    {
+        $token = $request->bearerToken();
+        $validToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+        if ($validToken) {
+            return $this->success([], 'Token is valid');
+        }
+        return $this->fail('Invalid or expired token', 401);
+    }
+
 }
