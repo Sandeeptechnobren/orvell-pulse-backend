@@ -8,10 +8,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Traits\ResponseTrait;
 use App\Models\User;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
     use ResponseTrait;
+
     // Signup
     public function signup(Request $request)
     {
@@ -20,8 +22,7 @@ class AuthController extends Controller
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|min:6'
         ]);
-        
-        // Insert user in DB
+
         $userId = DB::table('users')->insertGetId([
             'name'       => $request->name,
             'email'      => $request->email,
@@ -30,11 +31,11 @@ class AuthController extends Controller
             'updated_at' => now()
         ]);
 
-        // Get user as Eloquent model to generate token
         $user = User::find($userId);
 
-        // Create token using Sanctum
-        $token = $user->createToken('api_token')->plainTextToken;
+        // Create token with expiry (7 days)
+        $tokenResult = $user->createToken('api_token', [], now()->addDays(7));
+        $token = $tokenResult->plainTextToken;
 
         return response()->json([
             'status' => true,
@@ -68,11 +69,11 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Convert DB user to Eloquent model to generate token
         $userModel = User::find($user->id);
 
-        // Create new token
-        $token = $userModel->createToken('api_token')->plainTextToken;
+        // Create token with expiry (7 days)
+        $tokenResult = $userModel->createToken('api_token', [], now()->addDays(7));
+        $token = $tokenResult->plainTextToken;
 
         return response()->json([
             'status' => true,
@@ -81,6 +82,7 @@ class AuthController extends Controller
             'token' => $token
         ]);
     }
+
     public function logout(Request $request)
     {
         $token = $request->user()->currentAccessToken();
@@ -100,11 +102,15 @@ class AuthController extends Controller
     public function tokenCheck(Request $request)
     {
         $token = $request->bearerToken();
-        $validToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+        $validToken = PersonalAccessToken::findToken($token);
+
         if ($validToken) {
+            if ($validToken->expires_at && $validToken->expires_at->isPast()) {
+                return $this->fail('Token expired', 401);
+            }
             return $this->success([], 'Token is valid');
         }
-        return $this->fail('Invalid or expired token', 401);
-    }
 
+        return $this->fail('Invalid token', 401);
+    }
 }

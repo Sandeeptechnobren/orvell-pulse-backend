@@ -13,12 +13,12 @@ trait ResponseTrait
         ], $status);
     }
 
-    protected function error($message, $status = 400, $errors = null)
+    public function fail($message = 'Failed', $code = 400, $data = [])
     {
         return response()->json([
-            'status'  => false,
+            'status' => false,
             'message' => $message,
-            'errors'  => $errors
-        ], $status);
+            'data' => $data
+        ], $code);
     }
 }

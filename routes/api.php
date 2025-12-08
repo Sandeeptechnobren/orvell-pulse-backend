@@ -9,8 +9,8 @@ use App\Http\Controllers\CustomerManagementController;
 Route::post('signup', [AuthController::class, 'signup']);
 Route::post('signin', [AuthController::class, 'signin']);
 
-Route::middleware('auth:sanctum')->group(function () {
    Route::post('tokenCheck', [AuthController::class, 'tokenCheck']);
+Route::middleware('auth:sanctum')->group(function () {
    Route::post('logout', [AuthController::class, 'logout']);
    Route::post('logoutall', [AuthController::class, 'logoutall']);
 Route::prefix('item-category')->group(function () { 
