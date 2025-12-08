@@ -18,14 +18,14 @@ Route::prefix('item-category')->group(function () {
    Route::post('/add', [StockManagementController::class, 'store']);
    Route::get('/show/{uuid}', [StockManagementController::class, 'show']);
    Route::put('/update/{uuid}', [StockManagementController::class, 'update']);
-   Route::delete('/destroy/{uuid}', [StockManagementController::class, 'destroy']);
+   Route::delete('/delete/{uuid}', [StockManagementController::class, 'destroy']);
    });
 Route::prefix('customer')->group(function (){
    Route::get('/list', [CustomerManagementController::class, 'index']);
    Route::post('/add', [CustomerManagementController::class, 'store']);
    Route::get('/show/{uuid}', [CustomerManagementController::class, 'show']);
    Route::put('/update/{uuid}', [CustomerManagementController::class, 'update']);
-   Route::delete('/destroy/{uuid}', [CustomerManagementController::class, 'destroy']);
+   Route::delete('/delete/{uuid}', [CustomerManagementController::class, 'destroy']);
    });
 
 Route::prefix('orders')->group(function () {

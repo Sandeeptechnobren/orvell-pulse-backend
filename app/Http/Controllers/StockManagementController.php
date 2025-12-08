@@ -22,8 +22,9 @@ class StockManagementController extends Controller
  */
     /**
      * @OA\Get(
-     *     path="api/customer/list",
+     *     path="/api/item-category/list",
      *     tags={"Stock Management"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Get all stock items",
      *     @OA\Response(
      *         response=200,
@@ -41,8 +42,9 @@ class StockManagementController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/stock",
+     *     path="/api/item-category/add",
      *     tags={"Stock Management"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Create a new stock item",
      *     @OA\RequestBody(
      *         required=true,
@@ -73,8 +75,9 @@ class StockManagementController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/stock/{uuid}",
+     *     path="/api/item-category/show/{uuid}",
      *     tags={"Stock Management"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Get a single stock item",
      *     @OA\Parameter(
      *         name="uuid",
@@ -100,8 +103,9 @@ class StockManagementController extends Controller
 
     /**
      * @OA\Put(
-     *     path="/api/stock/{uuid}",
+     *     path="/api/item-category/update/{uuid}",
      *     tags={"Stock Management"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Update a stock item",
      *     @OA\Parameter(
      *         name="uuid",
@@ -137,8 +141,9 @@ class StockManagementController extends Controller
 
     /**
      * @OA\Delete(
-     *     path="/api/stock/{uuid}",
+     *     path="/api/item-category/delete/{uuid}",
      *     tags={"Stock Management"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Delete a stock item",
      *     @OA\Parameter(
      *         name="uuid",

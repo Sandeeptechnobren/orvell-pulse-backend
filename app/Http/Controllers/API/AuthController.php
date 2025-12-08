@@ -14,7 +14,28 @@ class AuthController extends Controller
 {
     use ResponseTrait;
 
-    // Signup
+    /**
+     * @OA\Post(
+     *     path="/api/signup",
+     *     tags={"Auth"},
+     *     summary="User Signup",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             type="object",
+     *             example={
+     *                 "name": "Ujjwal",
+     *                 "email": "ujjwal@gmail.com",
+     *                 "password": "123456"
+     *             }
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Signup successful"
+     *     )
+     * )
+     */
     public function signup(Request $request)
     {
         $request->validate([
@@ -33,7 +54,6 @@ class AuthController extends Controller
 
         $user = User::find($userId);
 
-        // Create token with expiry (7 days)
         $tokenResult = $user->createToken('api_token', [], now()->addDays(7));
         $token = $tokenResult->plainTextToken;
 
@@ -45,7 +65,26 @@ class AuthController extends Controller
         ]);
     }
 
-    // Signin
+    /**
+     * @OA\Post(
+     *     path="/api/signin",
+     *     tags={"Auth"},
+     *     summary="User Signin",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             example={
+     *                  "email": "ujjwal@gmail.com",
+     *                 "password": "123456"
+     *             }
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Signin successful"
+     *     )
+     * )
+     */
     public function signin(Request $request)
     {
         $request->validate([
@@ -71,7 +110,6 @@ class AuthController extends Controller
 
         $userModel = User::find($user->id);
 
-        // Create token with expiry (7 days)
         $tokenResult = $userModel->createToken('api_token', [], now()->addDays(7));
         $token = $tokenResult->plainTextToken;
 
@@ -83,6 +121,18 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/logout",
+     *     tags={"Auth"},
+     *     summary="Logout current token",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Logged out successfully"
+     *     )
+     * )
+     */
     public function logout(Request $request)
     {
         $token = $request->user()->currentAccessToken();
@@ -92,6 +142,18 @@ class AuthController extends Controller
         return $this->success(null, 'Logged out successfully');
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/logout-all",
+     *     tags={"Auth"},
+     *     summary="Logout from all devices",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Logged out from all devices"
+     *     )
+     * )
+     */
     public function logoutAll(Request $request)
     {
         $user = $request->user();
@@ -99,6 +161,18 @@ class AuthController extends Controller
         return $this->success(null, 'Logged out from all devices');
     }
 
+    /**
+     * @OA\post(
+     *     path="/api/tokenCheck",
+     *     tags={"Auth"},
+     *     summary="Check if token is valid",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Token is valid"
+     *     )
+     * )
+     */
     public function tokenCheck(Request $request)
     {
         $token = $request->bearerToken();
