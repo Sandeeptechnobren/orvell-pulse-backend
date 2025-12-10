@@ -12,18 +12,33 @@
                     "Auth"
                 ],
                 "summary": "User Signup",
+                "description": "Register a new user account.",
                 "operationId": "f886d970a4e3497817841e1dc8ca2348",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Ujjwal"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "example": "ujjwal@gmail.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
                                 "type": "object"
-                            },
-                            "example": {
-                                "name": "Ujjwal",
-                                "email": "ujjwal@gmail.com",
-                                "password": "123456"
                             }
                         }
                     }
@@ -41,15 +56,28 @@
                     "Auth"
                 ],
                 "summary": "User Signin",
+                "description": "Login using email and password.",
                 "operationId": "79c6d791322b54515db0ffd754169961",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
-                            "schema": {},
-                            "example": {
-                                "email": "ujjwal@gmail.com",
-                                "password": "123456"
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "example": "ujjwal@gmail.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
+                                "type": "object"
                             }
                         }
                     }
@@ -57,6 +85,12 @@
                 "responses": {
                     "200": {
                         "description": "Signin successful"
+                    },
+                    "401": {
+                        "description": "Invalid password"
+                    },
+                    "404": {
+                        "description": "User not found"
                     }
                 }
             }
@@ -66,7 +100,7 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout current token",
+                "summary": "Logout current device",
                 "operationId": "ad65cbbd4e9f201619eae184a5961a98",
                 "responses": {
                     "200": {
@@ -109,6 +143,9 @@
                 "responses": {
                     "200": {
                         "description": "Token is valid"
+                    },
+                    "401": {
+                        "description": "Invalid or expired token"
                     }
                 },
                 "security": [

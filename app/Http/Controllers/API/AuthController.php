@@ -19,15 +19,14 @@ class AuthController extends Controller
      *     path="/api/signup",
      *     tags={"Auth"},
      *     summary="User Signup",
+     *     description="Register a new user account.",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             type="object",
-     *             example={
-     *                 "name": "Ujjwal",
-     *                 "email": "ujjwal@gmail.com",
-     *                 "password": "123456"
-     *             }
+     *             required={"name","email","password"},
+     *             @OA\Property(property="name", type="string", example="Ujjwal"),
+     *             @OA\Property(property="email", type="string", example="ujjwal@gmail.com"),
+     *             @OA\Property(property="password", type="string", example="123456")
      *         )
      *     ),
      *     @OA\Response(
@@ -44,25 +43,34 @@ class AuthController extends Controller
             'password' => 'required|min:6'
         ]);
 
-        $userId = DB::table('users')->insertGetId([
-            'name'       => $request->name,
-            'email'      => $request->email,
-            'password'   => Hash::make($request->password),
-            'created_at' => now(),
-            'updated_at' => now()
-        ]);
+        DB::beginTransaction();
 
-        $user = User::find($userId);
+        try {
+            $user = User::create([
+                'name'     => $request->name,
+                'email'    => $request->email,
+                'password' => Hash::make($request->password),
+            ]);
 
-        $tokenResult = $user->createToken('api_token', [], now()->addDays(7));
-        $token = $tokenResult->plainTextToken;
+            $token = $user->createToken('api_token', [], now()->addDays(7))->plainTextToken;
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Signup successful',
-            'user' => $user,
-            'token' => $token
-        ]);
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Signup successful',
+                'user' => $user,
+                'token' => $token
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Signup failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -70,19 +78,18 @@ class AuthController extends Controller
      *     path="/api/signin",
      *     tags={"Auth"},
      *     summary="User Signin",
+     *     description="Login using email and password.",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             example={
-     *                  "email": "ujjwal@gmail.com",
-     *                 "password": "123456"
-     *             }
+     *             required={"email","password"},
+     *             @OA\Property(property="email", type="string", example="ujjwal@gmail.com"),
+     *             @OA\Property(property="password", type="string", example="123456")
      *         )
      *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Signin successful"
-     *     )
+     *     @OA\Response(response=200, description="Signin successful"),
+     *     @OA\Response(response=401, description="Invalid password"),
+     *     @OA\Response(response=404, description="User not found")
      * )
      */
     public function signin(Request $request)
@@ -92,41 +99,55 @@ class AuthController extends Controller
             'password' => 'required'
         ]);
 
-        $user = DB::table('users')->where('email', $request->email)->first();
+        DB::beginTransaction();
 
-        if (! $user) {
+        try {
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid password'
+                ], 401);
+            }
+
+            $token = $user->createToken('api_token', [], now()->addDays(7))->plainTextToken;
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Signin successful',
+                'user' => $user,
+                'token' => $token
+            ]);
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
             return response()->json([
                 'status' => false,
-                'message' => 'User not found'
-            ], 404);
+                'message' => 'Signin failed',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        if (! Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid password'
-            ], 401);
-        }
-
-        $userModel = User::find($user->id);
-
-        $tokenResult = $userModel->createToken('api_token', [], now()->addDays(7));
-        $token = $tokenResult->plainTextToken;
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Signin successful',
-            'user' => $user,
-            'token' => $token
-        ]);
     }
 
     /**
      * @OA\Post(
      *     path="/api/logout",
      *     tags={"Auth"},
-     *     summary="Logout current token",
-     *     security={{"bearerAuth": {}}},
+     *     summary="Logout current device",
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Logged out successfully"
@@ -139,6 +160,7 @@ class AuthController extends Controller
         if ($token) {
             $token->delete();
         }
+
         return $this->success(null, 'Logged out successfully');
     }
 
@@ -147,7 +169,7 @@ class AuthController extends Controller
      *     path="/api/logout-all",
      *     tags={"Auth"},
      *     summary="Logout from all devices",
-     *     security={{"bearerAuth": {}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Logged out from all devices"
@@ -156,8 +178,7 @@ class AuthController extends Controller
      */
     public function logoutAll(Request $request)
     {
-        $user = $request->user();
-        $user->tokens()->delete();
+        $request->user()->tokens()->delete();
         return $this->success(null, 'Logged out from all devices');
     }
 
@@ -166,10 +187,14 @@ class AuthController extends Controller
      *     path="/api/tokenCheck",
      *     tags={"Auth"},
      *     summary="Check if token is valid",
-     *     security={{"bearerAuth": {}}},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Token is valid"
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Invalid or expired token"
      *     )
      * )
      */

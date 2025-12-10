@@ -3,26 +3,28 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 return new class extends Migration
 {
-    use SoftDeletes;
-    public function up()
+    public function up(): void
     {
-        Schema::create('orders', function (Blueprint $table) {
+        Schema::create('customer_management', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid');
-            $table->string('order_no')->unique();
-            $table->string('customer_name');
-            $table->decimal('total_amount');
-            $table->string('status')->default('pending');
+            $table->uuid('uuid')->unique();
+            $table->string('name');
+            $table->string('phone_no')->nullable();
+            $table->string('whatsapp_no')->nullable();
+            $table->string('address_1')->nullable();
+            $table->string('address_2')->nullable();
+            $table->string('district')->nullable();
+            $table->string('state')->nullable();
+            $table->string('zip_code')->nullable();
 
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
 
+            $table->softDeletes();
             $table->timestamps();
-            $table->softDeletes(); 
 
             $table->foreign('created_by')->references('id')->on('users')->nullOnDelete();
             $table->foreign('updated_by')->references('id')->on('users')->nullOnDelete();
@@ -31,6 +33,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('orders');
+        Schema::dropIfExists('customer_management');
     }
 };
