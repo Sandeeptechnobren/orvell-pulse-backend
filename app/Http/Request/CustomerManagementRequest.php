@@ -14,6 +14,7 @@ class CustomerManagementRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'customer_code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'phone_no' => 'nullable|string|max:20',
             'whatsapp_no' => 'nullable|string|max:20',

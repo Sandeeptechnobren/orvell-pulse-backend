@@ -2,167 +2,229 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Request\StockManagementRequest;
 use App\Services\StockManagementService;
+use App\Http\Request\StockManagementRequest;
 use App\Http\Resources\StockManagementResource;
+use App\Traits\ResponseTrait;
 
+/**
+ * @OA\Tag(
+ *     name="Stock Management",
+ *     description="Stock management APIs"
+ * )
+ */
 class StockManagementController extends Controller
 {
+    use ResponseTrait;
+
     protected $service;
 
     public function __construct(StockManagementService $service)
     {
         $this->service = $service;
     }
-/**
- * @OA\Info(
- *     title="Test API",
- *     version="1.0.0"
- * )
- */
+
     /**
+     * Get Stock List
+     *
      * @OA\Get(
-     *     path="/api/item-category/list",
+     *     path="/api/stocks",
      *     tags={"Stock Management"},
-     *     security={{"bearerAuth":{}}},
-     *     summary="Get all stock items",
+     *     summary="Get stock list",
+     *     description="Fetch all stock records",
      *     @OA\Response(
      *         response=200,
-     *         description="Item categories fetched"
+     *         description="Stock list fetched successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Stock list fetched successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/StockManagement")
+     *             )
+     *         )
      *     )
      * )
      */
     public function index()
     {
-        return response()->json([
-            'message' => 'Item categories fetched',
-            'data' => StockManagementResource::collection($this->service->list())
-        ]);
+        $stock = $this->service->list();
+
+        return $this->success(
+            'Stock list fetched successfully',
+            $stock
+        );
     }
 
     /**
+     * Create Stock
+     *
      * @OA\Post(
-     *     path="/api/item-category/add",
+     *     path="/api/stocks",
      *     tags={"Stock Management"},
-     *     security={{"bearerAuth":{}}},
-     *     summary="Create a new stock item",
+     *     summary="Create stock",
+     *     description="Create a new stock entry",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             type="object",
-     *             example={
-     *                "name": "Laptop",
-     *                "quantity": 10,
-     *                "description": "Office laptops"
-     *             }
+     *             required={"product_name","quantity"},
+     *             @OA\Property(property="product_name", type="string", example="iPhone 15"),
+     *             @OA\Property(property="quantity", type="integer", example=50),
+     *             @OA\Property(property="price", type="number", example=79999)
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
-     *         description="Item category created"
+     *         description="Stock created successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Stock created successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/StockManagement")
+     *         )
      *     )
      * )
      */
     public function store(StockManagementRequest $request)
     {
-        $item = $this->service->create($request->validated());
+        $stock = $this->service->create($request->validated());
 
-        return response()->json([
-            'message' => 'Item category created',
-            'data' => new StockManagementResource($item)
-        ]);
+        return $this->success(
+            'Stock created successfully',
+            new StockManagementResource($stock),
+            201
+        );
     }
 
     /**
+     * Get Stock by UUID
+     *
      * @OA\Get(
-     *     path="/api/item-category/show/{uuid}",
+     *     path="/api/stocks/{uuid}",
      *     tags={"Stock Management"},
-     *     security={{"bearerAuth":{}}},
-     *     summary="Get a single stock item",
+     *     summary="Get stock details",
+     *     description="Fetch stock by UUID",
      *     @OA\Parameter(
      *         name="uuid",
      *         in="path",
      *         required=true,
-     *         description="UUID of the stock item"
+     *         @OA\Schema(type="string", example="550e8400-e29b-41d4-a716-446655440000")
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Item category fetched"
+     *         description="Stock fetched successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Stock fetched successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/StockManagement")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Stock not found"
      *     )
      * )
      */
     public function show($uuid)
     {
-        $item = $this->service->getByUuid($uuid);
+        $stock = $this->service->getByUuid($uuid);
 
-        return response()->json([
-            'message' => 'Item category fetched',
-            'data' => new StockManagementResource($item)
-        ]);
+        if (!$stock) {
+            return $this->error('Stock not found', [], 404);
+        }
+
+        return $this->success(
+            'Stock fetched successfully',
+            new StockManagementResource($stock)
+        );
     }
 
     /**
+     * Update Stock
+     *
      * @OA\Put(
-     *     path="/api/item-category/update/{uuid}",
+     *     path="/api/stocks/{uuid}",
      *     tags={"Stock Management"},
-     *     security={{"bearerAuth":{}}},
-     *     summary="Update a stock item",
+     *     summary="Update stock",
+     *     description="Update stock by UUID",
      *     @OA\Parameter(
      *         name="uuid",
      *         in="path",
      *         required=true,
-     *         description="UUID of the stock item"
+     *         @OA\Schema(type="string")
      *     ),
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             example={
-     *                "name": "Updated Laptop",
-     *                "quantity": 20,
-     *                "description": "Updated description"
-     *             }
+     *             required={"product_name","quantity"},
+     *             @OA\Property(property="product_name", type="string", example="iPhone 15"),
+     *             @OA\Property(property="quantity", type="integer", example=60),
+     *             @OA\Property(property="price", type="number", example=84999)
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Item category updated"
+     *         description="Stock updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Stock updated successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/StockManagement")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Stock not found"
      *     )
      * )
      */
     public function update(StockManagementRequest $request, $uuid)
     {
-        $item = $this->service->updateByUuid($uuid, $request->validated());
+        $stock = $this->service->update($uuid, $request->validated());
 
-        return response()->json([
-            'message' => 'Item category updated',
-            'data' => new StockManagementResource($item)
-        ]);
+        if (!$stock) {
+            return $this->error('Stock not found', [], 404);
+        }
+
+        return $this->success(
+            'Stock updated successfully',
+            new StockManagementResource($stock)
+        );
     }
 
     /**
+     * Delete Stock
+     *
      * @OA\Delete(
-     *     path="/api/item-category/delete/{uuid}",
+     *     path="/api/stocks/{uuid}",
      *     tags={"Stock Management"},
-     *     security={{"bearerAuth":{}}},
-     *     summary="Delete a stock item",
+     *     summary="Delete stock",
+     *     description="Delete stock by UUID",
      *     @OA\Parameter(
      *         name="uuid",
      *         in="path",
      *         required=true,
-     *         description="UUID of the stock item"
+     *         @OA\Schema(type="string")
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Item category deleted"
+     *         description="Stock deleted successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Stock deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Stock not found"
      *     )
      * )
      */
     public function destroy($uuid)
     {
-        $this->service->deleteByUuid($uuid);
+        if (!$this->service->delete($uuid)) {
+            return $this->error('Stock not found', [], 404);
+        }
 
-        return response()->json([
-            'message' => 'Item category deleted'
-        ]);
+        return $this->success('Stock deleted successfully');
     }
 }

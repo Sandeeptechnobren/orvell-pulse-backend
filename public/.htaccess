@@ -1,19 +1,13 @@
 <IfModule mod_rewrite.c>
+    Options -MultiViews -Indexes
     RewriteEngine On
 
-    RewriteBase /orvell-pulse/
-
-    # Redirect Trailing Slashes If Not A Folder
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} (.+)/$
-    RewriteRule ^ %1 [L,R=301]
-
-    # Authorization headers
+    # Pass Authorization Header for Sanctum / APIs
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Send Requests To Front Controller
-    RewriteCond %{REQUEST_FILENAME} !-d
+    # Allow Laravel to handle routes
     RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule . /orvell-pulse/index.php [L]
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
 </IfModule>

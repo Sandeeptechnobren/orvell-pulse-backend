@@ -1,47 +1,42 @@
 <?php
 
 namespace App\Services;
-
-use App\Models\CustomerManagement;
+use App\Models\Customer;
 use Illuminate\Support\Facades\DB;
 
 class CustomerManagementService
 {
-    public function list()
+public function list()
     {
-        return CustomerManagement::whereNull('deleted_at')
-            ->orderBy('id', 'desc')
+        return Customer::whereNull('deleted_at')
+            ->orderBy('id', 'asc')
             ->get();
     }
-
-    public function create(array $data)
+public function create(array $data)
     {
         return DB::transaction(function () use ($data) {
-            return CustomerManagement::create($data);
+            return Customer::create($data);
         });
     }
-
-    public function getByUuid($uuid)
+public function getByUuid($uuid)
     {
-        return CustomerManagement::where('uuid', $uuid)
+        return Customer::where('uuid', $uuid)
             ->whereNull('deleted_at')
             ->firstOrFail();
     }
-
-    public function update($uuid, array $data)
+public function update($uuid, array $data)
     {
         return DB::transaction(function () use ($uuid, $data) {
-            $item = CustomerManagement::where('uuid', $uuid)->firstOrFail();
+            $item = Customer::where('uuid', $uuid)->firstOrFail();
             $item->update($data);
             return $item;
         });
     }
-
     public function delete($uuid)
     {
         return DB::transaction(function () use ($uuid) {
-            $item = CustomerManagement::where('uuid', $uuid)->firstOrFail();
-            return $item->update(['deleted_at' => now()]);
+            $item = Customer::where('uuid', $uuid)->firstOrFail();
+            return $item->delete(['deleted_at' => now()]);
         });
     }
 }

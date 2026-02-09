@@ -5,7 +5,7 @@ return [
     'documentations' => [
         'default' => [
             'api' => [
-                'title' => 'L5 Swagger UI',
+                'title' => 'Orvell Backend API Documentation',
             ],
 
             'routes' => [
@@ -45,6 +45,7 @@ return [
                  */
                 'annotations' => [
                     base_path('app'),
+                    
                 ],
             ],
         ],

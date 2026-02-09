@@ -3,9 +3,14 @@
 namespace App\Http\Controllers;
 /**
  * @OA\Info(
- *     title="Orvell Pulse API",
+ *     title="Orvell API",
  *     version="1.0.0",
- *     description="API documentation for Orvell Pulse backend."
+ *     description="API documentation for Orvell Website"
+ * )
+ *
+ * @OA\Server(
+ *     url="/projects/orvell/public",
+ *     description="API Base URL"
  * )
  *
  * @OA\SecurityScheme(
@@ -15,6 +20,7 @@ namespace App\Http\Controllers;
  *     bearerFormat="JWT"
  * )
  */
+
 
 abstract class Controller
 {

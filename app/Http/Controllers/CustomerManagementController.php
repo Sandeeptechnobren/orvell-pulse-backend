@@ -6,6 +6,12 @@ use App\Http\Request\CustomerManagementRequest;
 use App\Http\Resources\CustomerManagementResource;
 use App\Services\CustomerManagementService;
 
+/**
+ * @OA\Tag(
+ *     name="Customer Management",
+ *     description="Customer management APIs"
+ * )
+ */
 class CustomerManagementController extends Controller
 {
     protected $service;
@@ -16,14 +22,24 @@ class CustomerManagementController extends Controller
     }
 
     /**
+     * Get Customers List
+     *
      * @OA\Get(
-     *     path="/api/customer/list",
-     *     tags={"Customers"},
-     * security={{"bearerAuth":{}}},
-     *     summary="Get all customers",
+     *     path="/api/customers",
+     *     tags={"Customer Management"},
+     *     summary="Get customers list",
+     *     description="Fetch all customers",
      *     @OA\Response(
      *         response=200,
-     *         description="Customers fetched",
+     *         description="Customers fetched successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Customers fetched"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/CustomerManagement")
+     *             )
+     *         )
      *     )
      * )
      */
@@ -31,30 +47,36 @@ class CustomerManagementController extends Controller
     {
         return response()->json([
             'message' => 'Customers fetched',
-            'data' => CustomerManagementResource::collection($this->service->list())
+            'data' => CustomerManagementResource::collection(
+                $this->service->list()
+            )
         ]);
     }
 
     /**
+     * Create Customer
+     *
      * @OA\Post(
-     *     path="/api/customer/add",
-     *     tags={"Customers"},
-     * security={{"bearerAuth":{}}},
+     *     path="/api/customers",
+     *     tags={"Customer Management"},
      *     summary="Create customer",
+     *     description="Create a new customer",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             type="object",
-     *             example={
-     *                 "name": "Rahul",
-     *                 "email": "rahul@example.com",
-     *                 "phone": "9876543210"
-     *             }
+     *             required={"name","email"},
+     *             @OA\Property(property="name", type="string", example="John Doe"),
+     *             @OA\Property(property="email", type="string", example="john@example.com"),
+     *             @OA\Property(property="phone", type="string", example="9876543210")
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
      *         description="Customer created",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Customer created"),
+     *             @OA\Property(property="data", ref="#/components/schemas/CustomerManagement")
+     *         )
      *     )
      * )
      */
@@ -65,24 +87,31 @@ class CustomerManagementController extends Controller
         return response()->json([
             'message' => 'Customer created',
             'data' => new CustomerManagementResource($item)
-        ]);
+        ], 201);
     }
 
     /**
+     * Get Customer by UUID
+     *
      * @OA\Get(
-     *     path="/api/customer/show/{uuid}",
-     *     tags={"Customers"},
-     * security={{"bearerAuth":{}}},
-     *     summary="Get customer by uuid",
+     *     path="/api/customers/{uuid}",
+     *     tags={"Customer Management"},
+     *     summary="Get customer details",
+     *     description="Fetch customer by UUID",
      *     @OA\Parameter(
      *         name="uuid",
      *         in="path",
      *         required=true,
-     *         description="Customer UUID"
+     *         description="Customer UUID",
+     *         @OA\Schema(type="string", example="550e8400-e29b-41d4-a716-446655440000")
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Customer fetched"
+     *         description="Customer fetched",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Customer fetched"),
+     *             @OA\Property(property="data", ref="#/components/schemas/CustomerManagement")
+     *         )
      *     )
      * )
      */
@@ -97,31 +126,35 @@ class CustomerManagementController extends Controller
     }
 
     /**
+     * Update Customer
+     *
      * @OA\Put(
-     *     path="/api/customer/update/{uuid}",
-     *     tags={"Customers"},
-     * security={{"bearerAuth":{}}},
+     *     path="/api/customers/{uuid}",
+     *     tags={"Customer Management"},
      *     summary="Update customer",
+     *     description="Update customer by UUID",
      *     @OA\Parameter(
      *         name="uuid",
      *         in="path",
      *         required=true,
-     *         description="Customer UUID"
+     *         @OA\Schema(type="string")
      *     ),
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             type="object",
-     *             example={
-     *                 "name": "Updated Name",
-     *                 "email": "updated@example.com",
-     *                 "phone": "9988776655"
-     *             }
+     *             required={"name","email"},
+     *             @OA\Property(property="name", type="string", example="John Doe"),
+     *             @OA\Property(property="email", type="string", example="john@example.com"),
+     *             @OA\Property(property="phone", type="string", example="9876543210")
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Customer updated"
+     *         description="Customer updated",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Customer updated"),
+     *             @OA\Property(property="data", ref="#/components/schemas/CustomerManagement")
+     *         )
      *     )
      * )
      */
@@ -136,20 +169,25 @@ class CustomerManagementController extends Controller
     }
 
     /**
+     * Delete Customer
+     *
      * @OA\Delete(
-     *     path="/api/customer/delete/{uuid}",
-     *     tags={"Customers"},
-     * security={{"bearerAuth":{}}},
+     *     path="/api/customers/{uuid}",
+     *     tags={"Customer Management"},
      *     summary="Delete customer",
+     *     description="Delete customer by UUID",
      *     @OA\Parameter(
      *         name="uuid",
      *         in="path",
      *         required=true,
-     *         description="Customer UUID"
+     *         @OA\Schema(type="string")
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Customer deleted"
+     *         description="Customer deleted",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Customer deleted")
+     *         )
      *     )
      * )
      */
@@ -162,4 +200,3 @@ class CustomerManagementController extends Controller
         ]);
     }
 }
-

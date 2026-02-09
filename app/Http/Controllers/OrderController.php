@@ -4,13 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Services\OrderService;
 use App\Http\Resources\OrderResource;
-use App\Traits\ResponseTrait;
 
 class OrderController extends Controller
 {
-    use ResponseTrait;
-
-    protected $service;
+    protected OrderService $service;
 
     public function __construct(OrderService $service)
     {
@@ -31,11 +28,18 @@ class OrderController extends Controller
      */
     public function index()
     {
-        $orders = $this->service->list();
-        return $this->success(
-            'Orders fetched successfully',
-            OrderResource::collection($orders)
-        );
+        $orders = $this->service->list(); // must return paginate()
+
+        return response()->json([
+            'success' => true,
+            'data' => OrderResource::collection($orders),
+            'meta' => [
+                'current_page' => $orders->currentPage(),
+                'last_page'    => $orders->lastPage(),
+                'per_page'     => $orders->perPage(),
+                'total'        => $orders->total(),
+            ],
+        ]);
     }
 
     /**
@@ -60,17 +64,20 @@ class OrderController extends Controller
      *     )
      * )
      */
-    public function show($uuid)
+    public function show(string $uuid)
     {
         $order = $this->service->getByUuid($uuid);
 
         if (!$order) {
-            return $this->error('Order not found', [], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found',
+            ], 404);
         }
 
-        return $this->success(
-            'Order fetched successfully',
-            new OrderResource($order)
-        );
+        return response()->json([
+            'success' => true,
+            'data' => new OrderResource($order),
+        ]);
     }
 }

@@ -17,8 +17,6 @@ return new class extends Migration
     $table->string('code')->unique();
     $table->string('category_name');
     $table->string('category_type');
-    $table->timestamp('created_date')->useCurrent();
-    $table->timestamp('updated_date')->useCurrent()->useCurrentOnUpdate();
     $table->unsignedBigInteger('created_by')->nullable();
     $table->unsignedBigInteger('updated_by')->nullable();
     $table->softDeletes();
