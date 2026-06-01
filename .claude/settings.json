@@ -1,0 +1,61 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+
+      "Bash(npm install*)",
+      "Bash(npm test*)",
+      "Bash(npm run dev*)",
+      "Bash(npm run build*)",
+      "Bash(npm run lint*)",
+      "Bash(npm start*)",
+      "Bash(npx *)",
+      "Bash(npx playwright *)",
+
+      "Bash(composer *)",
+      "Bash(php artisan *)",
+      "Bash(php *)",
+      "Bash(./vendor/bin/pint *)",
+      "Bash(./vendor/bin/phpunit *)",
+
+      "Bash(cat *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(ls *)",
+
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(curl *)",
+
+      "Bash(pm2 *)",
+      "Bash(docker *)",
+      "Bash(docker-compose *)",
+      "Bash(systemctl *)",
+      "Bash(journalctl *)",
+      "Bash(apachectl *)",
+      "Bash(apache2ctl *)",
+      "Bash(nginx *)",
+      "Bash(certbot *)",
+      "Bash(ufw *)",
+      "Bash(openssl *)",
+
+      "Bash(mysql *)",
+      "Bash(mysqldump *)",
+      "Bash(sqlite3 *)",
+      "Bash(redis-cli *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo rm -rf *)",
+      "Bash(> /dev/sda*)",
+      "Bash(mkfs *)",
+      "Bash(dd if=*)",
+      "Bash(sed -i *)",
+      "Bash(find * -exec *)"
+    ]
+  }
+}

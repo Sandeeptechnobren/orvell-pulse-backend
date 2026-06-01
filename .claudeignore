@@ -1,0 +1,35 @@
+# Build output
+.next/
+dist/
+build/
+out/
+public/build/
+public/hot/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Large data / runtime
+storage/framework/
+storage/logs/
+*.log
+*.sqlite
+*.sqlite-journal
+database/database.sqlite
+
+# Lock files (large, low-signal)
+package-lock.json
+composer.lock
+bun.lock
+yarn.lock
+pnpm-lock.yaml
+
+# Env & secrets
+.env
+.env.*
+
+# Coverage / caches
+coverage/
+.turbo/
+.phpunit.result.cache
