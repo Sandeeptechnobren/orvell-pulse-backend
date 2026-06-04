@@ -11,7 +11,7 @@ class OrderService
         'space:id,name',
         'customer:id,name,whatsapp_number',
         'product:id,name',
-    ])->paginate(10);
+    ])->latest('id')->paginate(50);
 }
     public function getByUuid($uuid)
     {

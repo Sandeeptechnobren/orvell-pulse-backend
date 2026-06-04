@@ -14,19 +14,26 @@ class Order extends Model
 
     protected $fillable = [
         'uuid',
-        'order_no',
+        'invoice_code',
+        'client_id',
         'space_id',
         'customer_id',
         'product_id',
         'order_quantity',
-        'total_amount',
-        'currency',
-        'payment_status',
+        'order_amount',
+        'payment_origin',
         'payment_method',
+        'payment_status',
         'payment_reference',
         'status',
-        'created_by',
-        'updated_by',
+        'pickup_code',
+        'pickup_status',
+        'company_name',
+        'salesperson_id',
+        'cashier_id',
+        'container_id',
+        'address',
+        'notes',
     ];
 
     public function space()
@@ -62,6 +69,14 @@ class Order extends Model
 
             if (empty($model->uuid)) {
                 $model->uuid = (string) Str::uuid();
+            }
+            // Auto-generate invoice code: INV-0001, INV-0002, ...
+            if (empty($model->invoice_code)) {
+                $last = static::withTrashed()->where('invoice_code', 'like', 'INV-%')
+                    ->orderByRaw('CAST(SUBSTRING(invoice_code, 5) AS UNSIGNED) DESC')
+                    ->value('invoice_code');
+                $num = ($last && preg_match('/INV-(\d+)/', $last, $im)) ? ((int) $im[1] + 1) : 1;
+                $model->invoice_code = 'INV-'.str_pad((string) $num, 4, '0', STR_PAD_LEFT);
             }
             //  Order No: ORD001
             // if (empty($model->order_no)) {

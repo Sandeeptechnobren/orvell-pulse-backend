@@ -7,7 +7,8 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\Item_categoryController;
 use App\Http\Controllers\StockManagementController;
 use App\Http\Controllers\CustomerManagementController;
-use App\Http\Controllers\WhatsappMessageController;
+use App\Http\Controllers\API\WhatsappMessageController;
+use App\Http\Controllers\API\WhatsAppWebhookController;
 use App\Http\Controllers\CountryController;
 
 Route::post('signup', [AuthController::class, 'register']);
@@ -17,6 +18,13 @@ Route::post('tokenCheck', [AuthController::class, 'tokenCheck']);
 //Route::post('password/change', [AuthController::class, 'changePassword']);
 Route::post('/password-reset', [AuthController::class, 'passwordResetFlow']);
 Route::get('Country',[CountryController::class,'countries']);
+
+// WhatsApp inbound webhook (Chatterly → admin stock management / customer orders)
+Route::post('whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);          // simple/test shape
+Route::post('whatsapp/chatterly', [WhatsAppWebhookController::class, 'chatterly']);     // real Chatterly gateway payload
+
+// Paystack payment webhook (charge.success → mark order paid + WhatsApp confirmation)
+Route::post('webhooks/paystack', [\App\Http\Controllers\API\PaystackWebhookController::class, 'handle']);
 
 Route::middleware('auth:sanctum')->group(function () {
   Route::post('logout', [AuthController::class, 'logout']);

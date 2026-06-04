@@ -16,6 +16,7 @@ class Customer extends Model
     protected $fillable = ['uuid',
         'name',
         'whatsapp_number',
+        'wa_id',
         'email',
         'address',
         'country',
@@ -30,6 +31,14 @@ class Customer extends Model
         static::creating(function ($model) {
             if (empty($model->uuid)) {
                 $model->uuid = (string) Str::uuid();
+            }
+            // Auto-generate buyer code: BUY001, BUY002, ...
+            if (empty($model->buyer_id)) {
+                $last = static::where('buyer_id', 'like', 'BUY%')
+                    ->orderByRaw('CAST(SUBSTRING(buyer_id, 4) AS UNSIGNED) DESC')
+                    ->value('buyer_id');
+                $num = ($last && preg_match('/BUY(\d+)/', $last, $m)) ? ((int) $m[1] + 1) : 1;
+                $model->buyer_id = 'BUY'.str_pad((string) $num, 3, '0', STR_PAD_LEFT);
             }
         });
     }

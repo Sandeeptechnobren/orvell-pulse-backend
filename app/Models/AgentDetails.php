@@ -15,6 +15,8 @@ class AgentDetails extends Model
     protected $fillable = [
         'uuid',
         'user_id',
+        'client_id',
+        'agent_type',
         '_isPremium',
         'instance_id',
         'creationTS',
