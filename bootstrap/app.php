@@ -40,10 +40,23 @@ return Application::configure(basePath: dirname(__DIR__))
         // ✅ Enable CORS
         $middleware->append(HandleCors::class);
 
+        // ✅ Spatie RBAC Middleware Aliases
+        $middleware->alias([
+            'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+        ]);
+
         // ❌ DO NOT add EnsureFrontendRequestsAreStateful
         // ❌ This middleware causes CSRF enforcement
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Uniform JSON handling for Spatie UnauthorizedException
+        $exceptions->render(function (\Spatie\Permission\Exceptions\UnauthorizedException $e, $request) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. User does not have the required role or permission for this operation.',
+            ], 403);
+        });
     })
     ->create();

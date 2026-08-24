@@ -9,13 +9,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Inbound WhatsApp webhooks.
- *
- *  POST /api/whatsapp/webhook    — simple/test shape { agent_type, from, message }; reply returned.
- *  POST /api/whatsapp/chatterly  — real Chatterly/Heywave gateway payload. The agent
- *                                  (admin|customer) is resolved from the instance the message
- *                                  arrived on (the QR-scanned number), then the reply is sent
- *                                  back to the sender through that same instance.
+ * @OA\Tag(
+ *     name="WhatsApp Webhooks",
+ *     description="Inbound WhatsApp message webhooks & Chatterly gateway integration"
+ * )
  */
 class WhatsAppWebhookController extends Controller
 {
@@ -23,7 +20,26 @@ class WhatsAppWebhookController extends Controller
     {
     }
 
-    /** Simple/test webhook: explicit agent_type. Reply returned in the HTTP response. */
+    /**
+     * Simple/test webhook: explicit agent_type. Reply returned in HTTP response.
+     *
+     * @OA\Post(
+     *     path="/api/whatsapp/webhook",
+     *     tags={"WhatsApp Webhooks"},
+     *     summary="Inbound WhatsApp message webhook (test/direct shape)",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"agent_type", "from", "message"},
+     *             @OA\Property(property="agent_type", type="string", enum={"admin", "customer"}, example="customer"),
+     *             @OA\Property(property="from", type="string", example="+233240000001"),
+     *             @OA\Property(property="message", type="string", example="catalog")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Webhook processed and reply returned"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function handle(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -41,7 +57,30 @@ class WhatsAppWebhookController extends Controller
         ]);
     }
 
-    /** Real Chatterly gateway webhook: resolve agent from instance, process, send reply back. */
+    /**
+     * Real Chatterly gateway webhook: resolve agent from instance, process, send reply back.
+     *
+     * @OA\Post(
+     *     path="/api/whatsapp/chatterly",
+     *     tags={"WhatsApp Webhooks"},
+     *     summary="Chatterly / Heywave inbound gateway webhook",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="instance", type="string", example="orvell_accra_bot"),
+     *             @OA\Property(property="instance_id", type="string", example="inst_12345"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="from", type="string", example="+233240000001"),
+     *                 @OA\Property(property="body", type="string", example="track ORD-001"),
+     *                 @OA\Property(property="fromMe", type="boolean", example=false)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Webhook acknowledged and message queued")
+     * )
+     */
     public function chatterly(Request $request, ChatterlyService $chatterly): JsonResponse
     {
         $p = $request->all();

@@ -1,25 +1,25 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "Orvell API",
-        "description": "API documentation for Orvell Website",
+        "title": "ORVELL PULSE Wholesale ERP Backend API",
+        "description": "Production REST API documentation for ORVELL PULSE Wholesale ERP system with Spatie RBAC, multi-company isolation, inventory tracking, cashier settlement, and automated reporting.",
         "version": "1.0.0"
     },
     "servers": [
         {
-            "url": "/projects/orvell/public",
-            "description": "API Base URL"
+            "url": "/",
+            "description": "Default API Host"
         }
     ],
     "paths": {
-        "/api/register": {
+        "/api/signup": {
             "post": {
                 "tags": [
                     "Orvell Auth"
                 ],
-                "summary": "Register client & verify email using OTP (Redis)",
-                "description": "\n     * STEP 1: Send name, business details, email, password → OTP sent  \n     * STEP 2: Send email + otp → signup completed\n     * ",
-                "operationId": "a718f172ff3ac464d723835815f8fb57",
+                "summary": "Register client & verify email using native Laravel SMTP OTP",
+                "description": "\n     * STEP 1: Send name, business details, email, password → OTP sent to email via native SMTP  \n     * STEP 2: Send email + otp → signup completed, token issued\n     * ",
+                "operationId": "2e8501b594ad8c647641ab3660ba82a7",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -36,11 +36,11 @@
                                     },
                                     "business_location": {
                                         "type": "string",
-                                        "example": "New Delhi"
+                                        "example": "Accra"
                                     },
                                     "phone_number": {
                                         "type": "string",
-                                        "example": "9999999999"
+                                        "example": "+233240000001"
                                     },
                                     "email": {
                                         "type": "string",
@@ -52,8 +52,8 @@
                                         "example": "password123"
                                     },
                                     "otp": {
-                                        "type": "integer",
-                                        "example": 123456
+                                        "type": "string",
+                                        "example": "123456"
                                     }
                                 },
                                 "type": "object"
@@ -74,13 +74,13 @@
                 }
             }
         },
-        "/api/login": {
+        "/api/signin": {
             "post": {
                 "tags": [
                     "Orvell Auth"
                 ],
-                "summary": "Client login",
-                "operationId": "44212a9096e4b09358281e9ec8a0701d",
+                "summary": "Client / Staff login",
+                "operationId": "1df10572334dc7e45c9fdfa3464b3e16",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -115,37 +115,62 @@
                 }
             }
         },
+        "/api/tokenCheck": {
+            "post": {
+                "tags": [
+                    "Orvell Auth"
+                ],
+                "summary": "Verify token validity and return authenticated user context",
+                "operationId": "eb47c3d3d548f22060d1bb7ba434d7b8",
+                "responses": {
+                    "200": {
+                        "description": "Token is valid"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/logout": {
             "post": {
                 "tags": [
                     "Orvell Auth"
                 ],
-                "summary": "Logout client",
-                "description": "Logout authenticated client by revoking current access token",
+                "summary": "Logout client / user",
+                "description": "Revokes the current access token",
                 "operationId": "79854151e609bd20032aa5aa4d5a35c0",
                 "responses": {
                     "200": {
-                        "description": "Logged out successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Logged out successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Logged out successfully"
                     },
                     "401": {
                         "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/logoutall": {
+            "post": {
+                "tags": [
+                    "Orvell Auth"
+                ],
+                "summary": "Logout from all devices",
+                "description": "Revokes all access tokens for the authenticated user",
+                "operationId": "e1de2471e451a50b3b02391c33e9e02c",
+                "responses": {
+                    "200": {
+                        "description": "Logged out from all sessions successfully"
                     }
                 },
                 "security": [
@@ -160,7 +185,7 @@
                 "tags": [
                     "Orvell Auth"
                 ],
-                "summary": "Password reset flow with OTP (Redis)",
+                "summary": "Password reset flow using native SMTP OTP",
                 "operationId": "71a4b96e9656b4ccb25018c5842a3ae2",
                 "requestBody": {
                     "required": true,
@@ -173,8 +198,8 @@
                                         "example": "test@orvell.com"
                                     },
                                     "otp": {
-                                        "type": "integer",
-                                        "example": 123456
+                                        "type": "string",
+                                        "example": "123456"
                                     },
                                     "new_password": {
                                         "type": "string",
@@ -193,8 +218,999 @@
                     "400": {
                         "description": "Invalid or expired OTP"
                     },
+                    "404": {
+                        "description": "Email not registered"
+                    },
                     "500": {
                         "description": "Server error"
+                    }
+                }
+            }
+        },
+        "/api/bank-deposits/create": {
+            "post": {
+                "tags": [
+                    "Bank Deposits"
+                ],
+                "summary": "Record cashier bank deposit of counter cash",
+                "description": "Record Bank Deposit (Cashier / Admin)",
+                "operationId": "ec3e9918bbf1b1f4bebd6341e37ef874",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "amount",
+                                    "bank_name"
+                                ],
+                                "properties": {
+                                    "amount": {
+                                        "type": "number",
+                                        "example": 500
+                                    },
+                                    "bank_name": {
+                                        "type": "string",
+                                        "example": "GCB Bank"
+                                    },
+                                    "account_number": {
+                                        "type": "string",
+                                        "example": "1029384756"
+                                    },
+                                    "reference_number": {
+                                        "type": "string",
+                                        "example": "DEP-2026-001"
+                                    },
+                                    "deposit_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-08-09"
+                                    },
+                                    "deposit_slip_image": {
+                                        "type": "string",
+                                        "example": "https://storage.orvell.com/slips/slip1.jpg"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Morning till cash deposit"
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bank deposit recorded successfully"
+                    },
+                    "403": {
+                        "description": "Unauthorized. Only authorized Cashiers, Managers, and Admins can record bank deposits"
+                    },
+                    "422": {
+                        "description": "Validation error or duplicate reference"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/bank-deposits/list": {
+            "get": {
+                "tags": [
+                    "Bank Deposits"
+                ],
+                "summary": "List filtered bank deposits for authenticated company",
+                "description": "List Bank Deposits",
+                "operationId": "5806ca20938a6f892246294bc1477e39",
+                "parameters": [
+                    {
+                        "name": "bank_name",
+                        "in": "query",
+                        "description": "Filter by bank name",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "GCB Bank"
+                        }
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "Filter start date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-01"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "Filter end date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-31"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bank deposits list retrieved successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/bank-deposits/summary": {
+            "get": {
+                "tags": [
+                    "Bank Deposits"
+                ],
+                "summary": "Get bank deposit summary aggregated by bank for date range",
+                "description": "Bank Deposits Period Summary",
+                "operationId": "bc3b1d9e6f15d274364d7066f728ae2b",
+                "parameters": [
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "Summary start date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-01"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "Summary end date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-31"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bank deposit summary retrieved successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard/overview": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Retrieve live operational KPIs, cash in till, inventory breakdown, and alerts for company",
+                "description": "Get Real-time Dashboard Overview",
+                "operationId": "bb0b4c093578c1503e89563687f588e1",
+                "responses": {
+                    "200": {
+                        "description": "Live dashboard overview retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "company": {
+                                                    "type": "object"
+                                                },
+                                                "financials": {
+                                                    "type": "object"
+                                                },
+                                                "inventory": {
+                                                    "type": "object"
+                                                },
+                                                "orders": {
+                                                    "type": "object"
+                                                },
+                                                "low_stock_alerts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "recent_activity": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reconciliation/eod/generate": {
+            "post": {
+                "tags": [
+                    "EOD Reconciliation"
+                ],
+                "summary": "Generate End-of-Day financial and inventory reconciliation snapshot",
+                "description": "Generate EOD Reconciliation Report (Admin / Manager Only)",
+                "operationId": "571926306d3b335660e68b8374c52ed5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "date"
+                                ],
+                                "properties": {
+                                    "date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-08-09"
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "EOD reconciliation generated successfully"
+                    },
+                    "403": {
+                        "description": "Unauthorized. Only Admins and Managers can generate EOD reconciliation reports"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reconciliation/eod/show": {
+            "get": {
+                "tags": [
+                    "EOD Reconciliation"
+                ],
+                "summary": "Retrieve existing End-of-Day reconciliation report by date",
+                "description": "Show existing EOD Reconciliation Report",
+                "operationId": "decc04566c1bd4a875fa79a3dbba6802",
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "description": "Reconciliation report date (YYYY-MM-DD)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-09"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "EOD report retrieved successfully"
+                    },
+                    "404": {
+                        "description": "No EOD report found for date"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/expenses/create": {
+            "post": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "Record operational expense for company",
+                "description": "Record a new expense",
+                "operationId": "c034e1b8594524f25385b16ba7bb8ad8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "amount",
+                                    "category"
+                                ],
+                                "properties": {
+                                    "amount": {
+                                        "type": "number",
+                                        "example": 75
+                                    },
+                                    "category": {
+                                        "type": "string",
+                                        "example": "Fuel"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Generator fuel for warehouse"
+                                    },
+                                    "expense_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-08-09"
+                                    },
+                                    "receipt_image": {
+                                        "type": "string",
+                                        "example": "https://storage.orvell.com/receipts/exp1.jpg"
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Expense recorded successfully"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/expenses/list": {
+            "get": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "List filtered expenses for authenticated company",
+                "description": "List expenses",
+                "operationId": "21335a7dafd7f61f8c34bb9479b279c3",
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "Filter by expense category",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Fuel"
+                        }
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "Filter start date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-01"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "Filter end date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-31"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expenses list retrieved successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/expenses/summary": {
+            "get": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "Get expense summary aggregated by category for date range",
+                "description": "Get expense aggregate summary",
+                "operationId": "409f372704ecc97c20977962ac7febd1",
+                "parameters": [
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "Summary start date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-01"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "Summary end date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-08-31"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expense summary retrieved successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/invoices/amendment-request": {
+            "post": {
+                "tags": [
+                    "Invoice Amendment"
+                ],
+                "summary": "Submit request to amend an immutable finalized invoice",
+                "description": "Submit Invoice Amendment Request",
+                "operationId": "630ce753990bd4be2f8da5e5ba22de64",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "invoice_id",
+                                    "reason",
+                                    "requested_changes"
+                                ],
+                                "properties": {
+                                    "invoice_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "reason": {
+                                        "type": "string",
+                                        "example": "Price discount approved by manager"
+                                    },
+                                    "requested_changes": {
+                                        "type": "object",
+                                        "example": {
+                                            "discount_amount": 25
+                                        }
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Invoice amendment request submitted successfully"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/invoices/amendment/{id}/approve": {
+            "post": {
+                "tags": [
+                    "Invoice Amendment"
+                ],
+                "summary": "Approve invoice amendment request and generate versioned invoice",
+                "description": "Approve Invoice Amendment Request (Admin / Manager Only)",
+                "operationId": "72a537691d225ff29da54b10fd1a4055",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Amendment Request ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Invoice amendment approved and new version created"
+                    },
+                    "403": {
+                        "description": "Unauthorized. Only Admins and Managers can approve"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/invoices/amendment/{id}/reject": {
+            "post": {
+                "tags": [
+                    "Invoice Amendment"
+                ],
+                "summary": "Reject invoice amendment request with stated reason",
+                "description": "Reject Invoice Amendment Request (Admin / Manager Only)",
+                "operationId": "5836195e4adbc9ef5615a2ffd1264a52",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Amendment Request ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "rejection_reason"
+                                ],
+                                "properties": {
+                                    "rejection_reason": {
+                                        "type": "string",
+                                        "example": "Amendment rejected due to missing physical bale verification"
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Invoice amendment request rejected successfully"
+                    },
+                    "403": {
+                        "description": "Unauthorized. Only Admins and Managers can reject"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/invoices/amendment/list": {
+            "get": {
+                "tags": [
+                    "Invoice Amendment"
+                ],
+                "summary": "List invoice amendment requests for company",
+                "description": "List Invoice Amendment Requests",
+                "operationId": "59270394c681977c3931f8c2b16e2b10",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by request status (pending, approved, rejected)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "pending"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Amendment requests retrieved successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/webhooks/paystack": {
+            "post": {
+                "tags": [
+                    "Paystack Webhook"
+                ],
+                "summary": "Inbound Paystack webhook for automated payment settlement",
+                "description": "Process Paystack Inbound Webhook",
+                "operationId": "fefacb3b2241dad33565543e211ebb7e",
+                "parameters": [
+                    {
+                        "name": "x-paystack-signature",
+                        "in": "header",
+                        "description": "HMAC SHA512 signature of request payload computed using secret key",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "event",
+                                    "data"
+                                ],
+                                "properties": {
+                                    "event": {
+                                        "type": "string",
+                                        "example": "charge.success"
+                                    },
+                                    "data": {
+                                        "properties": {
+                                            "reference": {
+                                                "type": "string",
+                                                "example": "PAYSTACK-REF-123456"
+                                            },
+                                            "amount": {
+                                                "type": "integer",
+                                                "example": 35000
+                                            },
+                                            "currency": {
+                                                "type": "string",
+                                                "example": "GHS"
+                                            },
+                                            "status": {
+                                                "type": "string",
+                                                "example": "success"
+                                            },
+                                            "metadata": {
+                                                "properties": {
+                                                    "order_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "invoice_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Webhook processed successfully"
+                    },
+                    "400": {
+                        "description": "Invalid HMAC signature or validation error"
+                    },
+                    "500": {
+                        "description": "Server processing error"
+                    }
+                }
+            }
+        },
+        "/api/pickup/validate": {
+            "post": {
+                "tags": [
+                    "Pickup"
+                ],
+                "summary": "Validate buyer pickup code and return order & reserved bale items",
+                "description": "Validate Pickup Code",
+                "operationId": "358691a1f1da74abb43e88a46c8ec616",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pickup_code"
+                                ],
+                                "properties": {
+                                    "pickup_code": {
+                                        "type": "string",
+                                        "example": "PKP-ABC12345"
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pickup code valid and order details retrieved"
+                    },
+                    "422": {
+                        "description": "Invalid or expired pickup code"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pickup/release": {
+            "post": {
+                "tags": [
+                    "Pickup"
+                ],
+                "summary": "Release physical bales to buyer upon valid pickup code presentation",
+                "description": "Release Goods upon Pickup Code Presentation",
+                "operationId": "b998ad8f40b95c5c8baff17f3ad099d9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pickup_code"
+                                ],
+                                "properties": {
+                                    "pickup_code": {
+                                        "type": "string",
+                                        "example": "PKP-ABC12345"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Bales inspected and handed to driver"
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Bales released successfully and inventory ledger updated"
+                    },
+                    "422": {
+                        "description": "Validation error / unpaid order / already released"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/whatsapp/webhook": {
+            "post": {
+                "tags": [
+                    "WhatsApp Webhooks"
+                ],
+                "summary": "Inbound WhatsApp message webhook (test/direct shape)",
+                "description": "Simple/test webhook: explicit agent_type. Reply returned in HTTP response.",
+                "operationId": "780666a983a0ea91b7410ef1157c13cf",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "agent_type",
+                                    "from",
+                                    "message"
+                                ],
+                                "properties": {
+                                    "agent_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "admin",
+                                            "customer"
+                                        ],
+                                        "example": "customer"
+                                    },
+                                    "from": {
+                                        "type": "string",
+                                        "example": "+233240000001"
+                                    },
+                                    "message": {
+                                        "type": "string",
+                                        "example": "catalog"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Webhook processed and reply returned"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/api/whatsapp/chatterly": {
+            "post": {
+                "tags": [
+                    "WhatsApp Webhooks"
+                ],
+                "summary": "Chatterly / Heywave inbound gateway webhook",
+                "description": "Real Chatterly gateway webhook: resolve agent from instance, process, send reply back.",
+                "operationId": "5020d0aac739c3e38e00fb1f1fc54022",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "instance": {
+                                        "type": "string",
+                                        "example": "orvell_accra_bot"
+                                    },
+                                    "instance_id": {
+                                        "type": "string",
+                                        "example": "inst_12345"
+                                    },
+                                    "data": {
+                                        "properties": {
+                                            "from": {
+                                                "type": "string",
+                                                "example": "+233240000001"
+                                            },
+                                            "body": {
+                                                "type": "string",
+                                                "example": "track ORD-001"
+                                            },
+                                            "fromMe": {
+                                                "type": "boolean",
+                                                "example": false
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Webhook acknowledged and message queued"
                     }
                 }
             }
@@ -647,6 +1663,61 @@
                 ]
             }
         },
+        "/api/orders/create": {
+            "post": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Create new sale / order",
+                "operationId": "416b3022d3362001507184c5409f6956",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "buyer_id",
+                                    "items"
+                                ],
+                                "properties": {
+                                    "buyer_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "item_category_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "quantity": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Order created successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/orders/list": {
             "get": {
                 "tags": [
@@ -696,29 +1767,143 @@
                 ]
             }
         },
-        "/payment": {
-            "get": {
-                "tags": [
-                    "Payment"
-                ],
-                "summary": "Payment page",
-                "description": "Returns payment view (web only)",
-                "operationId": "f9856de4275291351dd4bdf4799455e7",
-                "responses": {
-                    "200": {
-                        "description": "Payment page loaded"
-                    }
-                }
-            }
-        },
-        "/api/payment": {
+        "/api/payment/cash": {
             "post": {
                 "tags": [
                     "Payment"
                 ],
-                "summary": "Create payment",
-                "description": "Make payment using Stripe",
-                "operationId": "0cee4cb401a915ff89f9a1af4e505d2c",
+                "summary": "Record cash payment at warehouse counter",
+                "description": "Cash Payment Recording (Cashier Counter)",
+                "operationId": "950c191a4fd1e8e94413bac0028ddaf0",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "invoice_id",
+                                    "amount"
+                                ],
+                                "properties": {
+                                    "invoice_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "amount": {
+                                        "type": "number",
+                                        "example": 300
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Cash payment received"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cash payment recorded successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/payment/verify": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Verify Paystack online transaction and update invoice",
+                "description": "Verify Paystack Transaction",
+                "operationId": "8632372517e23d20312adf964dbf2d7c",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "reference"
+                                ],
+                                "properties": {
+                                    "reference": {
+                                        "type": "string",
+                                        "example": "PAYSTACK-REF-123456"
+                                    },
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Paystack transaction verified successfully"
+                    },
+                    "422": {
+                        "description": "Verification failure or invoice mismatch"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/payment/history": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "List payment history for authenticated company",
+                "description": "Payment History (Company Scoped)",
+                "operationId": "5598bf4ea8124db2080424e516225aa5",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Pagination page number",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Payment history list retrieved successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/payment/create": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Create legacy card payment via Stripe",
+                "description": "Legacy Stripe Payment (Preserved for backward compatibility)",
+                "operationId": "cd6e5417ede4fe548304db2b33fb5bb5",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -739,7 +1924,7 @@
                                     },
                                     "email": {
                                         "type": "string",
-                                        "example": "user@example.com"
+                                        "example": "buyer@example.com"
                                     }
                                 },
                                 "type": "object"
@@ -749,53 +1934,17 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Payment successful",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Payment successful"
-                                        },
-                                        "data": {
-                                            "$ref": "#/components/schemas/Payment"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Payment successful"
                     },
-                    "400": {
-                        "description": "Payment failed"
+                    "422": {
+                        "description": "Validation error"
                     }
-                }
-            }
-        },
-        "/api/payment-history": {
-            "get": {
-                "tags": [
-                    "Payment"
-                ],
-                "summary": "Payment history",
-                "description": "Get all payment records",
-                "operationId": "f8d4888013776eca4bb7ed355c752ab7",
-                "responses": {
-                    "200": {
-                        "description": "Payment list",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Payment"
-                                    }
-                                }
-                            }
-                        }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
                     }
-                }
+                ]
             }
         },
         "/api/stocks": {
@@ -1236,60 +2385,27 @@
                 },
                 "type": "object"
             },
-            "Payment": {
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "example": 1
-                    },
-                    "payment_id": {
-                        "type": "string",
-                        "example": "ch_3NabcXYZ"
-                    },
-                    "customer_email": {
-                        "type": "string",
-                        "example": "user@example.com"
-                    },
-                    "amount": {
-                        "type": "number",
-                        "example": 500
-                    },
-                    "currency": {
-                        "type": "string",
-                        "example": "inr"
-                    },
-                    "status": {
-                        "type": "string",
-                        "example": "succeeded"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "example": "2025-01-01 10:00:00"
-                    }
-                },
-                "type": "object"
-            },
             "StockManagement": {
                 "properties": {
                     "uuid": {
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
-                    "product_name": {
+                    "name": {
                         "type": "string",
-                        "example": "iPhone 15"
+                        "example": "Summer Dresses Grade A"
                     },
-                    "quantity": {
+                    "stock": {
                         "type": "integer",
                         "example": 50
                     },
                     "price": {
                         "type": "number",
-                        "example": 79999
+                        "example": 250
                     },
                     "created_at": {
                         "type": "string",
-                        "example": "2025-01-01 10:00:00"
+                        "example": "2026-01-01 10:00:00"
                     }
                 },
                 "type": "object"
@@ -1310,11 +2426,11 @@
                     },
                     "created_at": {
                         "type": "string",
-                        "example": "2025-01-01 10:00:00"
+                        "example": "2026-01-01 10:00:00"
                     },
                     "updated_at": {
                         "type": "string",
-                        "example": "2025-01-01 10:30:00"
+                        "example": "2026-01-01 10:30:00"
                     }
                 },
                 "type": "object"
@@ -1323,6 +2439,7 @@
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
+                "description": "Enter Sanctum personal access token as: Bearer <token>",
                 "bearerFormat": "JWT",
                 "scheme": "bearer"
             }
@@ -1334,6 +2451,42 @@
             "description": "Authentication, Signup, Login & Password Reset APIs"
         },
         {
+            "name": "Bank Deposits",
+            "description": "Cashier Bank Deposit Management APIs"
+        },
+        {
+            "name": "Dashboard",
+            "description": "Real-time Operational Dashboard & KPI Analytics APIs"
+        },
+        {
+            "name": "EOD Reconciliation",
+            "description": "End-of-Day Financial and Inventory Reconciliation APIs"
+        },
+        {
+            "name": "Expenses",
+            "description": "Operational Expenses Management APIs"
+        },
+        {
+            "name": "Invoice Amendment",
+            "description": "Invoice amendment and approval workflow APIs"
+        },
+        {
+            "name": "Paystack Webhook",
+            "description": "Paystack HMAC verified payment webhook handler"
+        },
+        {
+            "name": "Pickup",
+            "description": "Warehouse Pickup & Physical Bale Release APIs"
+        },
+        {
+            "name": "WhatsApp Webhooks",
+            "description": "Inbound WhatsApp message webhooks & Chatterly gateway integration"
+        },
+        {
+            "name": "WhatsApp Agent",
+            "description": "WhatsApp agent initialization and prompt management APIs"
+        },
+        {
             "name": "Country",
             "description": "Country related APIs"
         },
@@ -1343,15 +2496,11 @@
         },
         {
             "name": "Payment",
-            "description": "Stripe payment APIs"
+            "description": "Payment and Cashier Settlement APIs"
         },
         {
             "name": "Stock Management",
             "description": "Stock management APIs"
-        },
-        {
-            "name": "WhatsApp Agent",
-            "description": "WhatsApp agent initialization and prompt management APIs"
         },
         {
             "name": "Orders",

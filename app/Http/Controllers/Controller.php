@@ -3,21 +3,22 @@
 namespace App\Http\Controllers;
 /**
  * @OA\Info(
- *     title="Orvell API",
+ *     title="ORVELL PULSE Wholesale ERP Backend API",
  *     version="1.0.0",
- *     description="API documentation for Orvell Website"
+ *     description="Production REST API documentation for ORVELL PULSE Wholesale ERP system with Spatie RBAC, multi-company isolation, inventory tracking, cashier settlement, and automated reporting."
  * )
  *
  * @OA\Server(
- *     url="/projects/orvell/public",
- *     description="API Base URL"
+ *     url="/",
+ *     description="Default API Host"
  * )
  *
  * @OA\SecurityScheme(
  *     securityScheme="bearerAuth",
  *     type="http",
  *     scheme="bearer",
- *     bearerFormat="JWT"
+ *     bearerFormat="JWT",
+ *     description="Enter Sanctum personal access token as: Bearer <token>"
  * )
  */
 

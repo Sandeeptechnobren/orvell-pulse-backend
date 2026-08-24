@@ -3,15 +3,59 @@
 namespace App\Http\Controllers;
 
 use App\Services\OrderService;
+use App\Services\SaleService;
 use App\Http\Resources\OrderResource;
+use Illuminate\Http\Request;
 
 class OrderController extends Controller
 {
     protected OrderService $service;
+    protected SaleService $saleService;
 
-    public function __construct(OrderService $service)
+    public function __construct(OrderService $service, SaleService $saleService)
     {
         $this->service = $service;
+        $this->saleService = $saleService;
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/orders/create",
+     *     tags={"Orders"},
+     *     summary="Create new sale / order",
+     *     security={{"bearerAuth": {}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"buyer_id", "items"},
+     *             @OA\Property(property="buyer_id", type="integer", example=1),
+     *             @OA\Property(property="items", type="array", @OA\Items(
+     *                 @OA\Property(property="item_category_id", type="integer", example=1),
+     *                 @OA\Property(property="quantity", type="integer", example=2)
+     *             ))
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Order created successfully")
+     * )
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'buyer_id'    => 'nullable|exists:buyers,id',
+            'buyer_phone' => 'nullable|string',
+            'items'       => 'required|array|min:1',
+        ]);
+
+        $companyId = auth()->user()?->company_id ?? $request->input('company_id');
+        $sale = $this->saleService->createSale($request->all(), $companyId);
+
+        return response()->json([
+            'success'     => true,
+            'message'     => 'Order created successfully',
+            'order'       => new OrderResource($sale['order']),
+            'invoice'     => $sale['invoice'],
+            'pickup_code' => $sale['pickup_code'],
+        ], 201);
     }
 
     /**

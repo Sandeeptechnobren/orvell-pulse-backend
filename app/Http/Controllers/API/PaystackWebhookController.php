@@ -5,60 +5,101 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\AgentDetails;
 use App\Models\Customer;
-use App\Models\Order;
+use App\Models\Buyer;
+use App\Services\PaymentService;
 use App\Services\ChatterlyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Paystack webhook — called by Paystack after a payment.
- * Verifies the HMAC signature, and on `charge.success` marks the order paid
- * and sends the customer a WhatsApp confirmation.
- *
- * Set this URL in the Paystack dashboard (Settings → API Keys & Webhooks):
- *   https://<public-url>/api/webhooks/paystack
+ * @OA\Tag(
+ *     name="Paystack Webhook",
+ *     description="Paystack HMAC verified payment webhook handler"
+ * )
  */
 class PaystackWebhookController extends Controller
 {
+    protected PaymentService $paymentService;
+
+    public function __construct(PaymentService $paymentService)
+    {
+        $this->paymentService = $paymentService;
+    }
+
+    /**
+     * Process Paystack Inbound Webhook
+     *
+     * @OA\Post(
+     *     path="/api/webhooks/paystack",
+     *     tags={"Paystack Webhook"},
+     *     summary="Inbound Paystack webhook for automated payment settlement",
+     *     @OA\Parameter(
+     *         name="x-paystack-signature",
+     *         in="header",
+     *         description="HMAC SHA512 signature of request payload computed using secret key",
+     *         required=true,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"event", "data"},
+     *             @OA\Property(property="event", type="string", example="charge.success"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="reference", type="string", example="PAYSTACK-REF-123456"),
+     *                 @OA\Property(property="amount", type="integer", example=35000),
+     *                 @OA\Property(property="currency", type="string", example="GHS"),
+     *                 @OA\Property(property="status", type="string", example="success"),
+     *                 @OA\Property(
+     *                     property="metadata",
+     *                     type="object",
+     *                     @OA\Property(property="order_id", type="integer", example=1),
+     *                     @OA\Property(property="invoice_id", type="integer", example=1)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Webhook processed successfully"),
+     *     @OA\Response(response=400, description="Invalid HMAC signature or validation error"),
+     *     @OA\Response(response=500, description="Server processing error")
+     * )
+     */
     public function handle(Request $request, ChatterlyService $chatterly): JsonResponse
     {
-        $payload   = $request->getContent();
-        $signature = (string) $request->header('x-paystack-signature');
-        $secret    = (string) config('paystack.secret_key');
+        $rawPayload = $request->getContent();
+        $signature  = (string) $request->header('x-paystack-signature');
+        $payloadData = $request->all();
 
-        // Verify the signature when a secret is configured.
-        if ($secret !== '' && $signature !== '') {
-            $computed = hash_hmac('sha512', $payload, $secret);
-            if (! hash_equals($computed, $signature)) {
-                Log::warning('[paystack-webhook] invalid signature');
+        try {
+            $result = $this->paymentService->handlePaystackWebhook($rawPayload, $signature, $payloadData);
 
-                return response()->json(['ok' => false, 'error' => 'invalid signature'], 401);
-            }
-        }
+            // Optional WhatsApp notification if order exists and payment is verified
+            if (!empty($result['order'])) {
+                $order = $result['order'];
+                $buyerPhone = $order->buyer?->whatsapp_number ?? $order->customer?->whatsapp_number;
 
-        $event = (string) $request->input('event');
-        $ref   = $request->input('data.reference');
-        Log::info('[paystack-webhook] '.$event.' ref='.$ref);
-
-        if ($event === 'charge.success' && $ref) {
-            $order = Order::where('payment_reference', $ref)->first();
-
-            if ($order && $order->payment_status !== 'paid') {
-                $order->payment_status = 'paid';
-                $order->status         = 'processing';
-                $order->save();
-
-                $customer = Customer::find($order->customer_id);
-                if ($customer && $customer->whatsapp_number) {
+                if ($buyerPhone) {
                     $agent = AgentDetails::where('agent_type', 'customer')->whereNotNull('token')->latest('id')->first();
-                    $chatterly->sendText($agent, (string) $customer->whatsapp_number,
-                        "✅ *Payment received!*\nOrder #{$order->id} confirmed.\nAmount: ".config('paystack.currency', 'GHS').' '.number_format((float) $order->order_amount, 2).
-                        "\nPickup code: *{$order->pickup_code}*\n\nThank you for shopping with Orvell Wholesale! 🎉");
+                    if ($agent) {
+                        $chatterly->sendText(
+                            $agent,
+                            (string) $buyerPhone,
+                            "✅ *Payment received!*\nOrder #{$order->order_no} confirmed.\nAmount: ".($order->currency ?? 'GHS').' '.number_format((float) $order->total_amount, 2).
+                            "\nPickup code: *{$order->pickup_code}*\n\nThank you for shopping with Orvell Wholesale! 🎉"
+                        );
+                    }
                 }
             }
-        }
 
-        return response()->json(['ok' => true]);
+            return response()->json(['ok' => true, 'result' => $result]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['ok' => false, 'errors' => $e->errors()], 400);
+        } catch (\Throwable $e) {
+            Log::error('[paystack-webhook] Error processing webhook: ' . $e->getMessage());
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 }
