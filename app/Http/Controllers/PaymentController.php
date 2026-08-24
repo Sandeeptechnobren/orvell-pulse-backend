@@ -8,12 +8,6 @@ use App\Services\PaymentService;
 use Stripe\Stripe;
 use Stripe\Charge;
 
-/**
- * @OA\Tag(
- *     name="Payment",
- *     description="Payment and Cashier Settlement APIs"
- * )
- */
 class PaymentController extends Controller
 {
     protected PaymentService $paymentService;
@@ -23,26 +17,6 @@ class PaymentController extends Controller
         $this->paymentService = $paymentService;
     }
 
-    /**
-     * Cash Payment Recording (Cashier Counter)
-     *
-     * @OA\Post(
-     *     path="/api/payment/cash",
-     *     tags={"Payment"},
-     *     summary="Record cash payment at warehouse counter",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"invoice_id", "amount"},
-     *             @OA\Property(property="invoice_id", type="integer", example=1),
-     *             @OA\Property(property="amount", type="number", example=300.00),
-     *             @OA\Property(property="notes", type="string", example="Cash payment received")
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Cash payment recorded successfully")
-     * )
-     */
     public function recordCash(Request $request)
     {
         $request->validate([
@@ -113,26 +87,6 @@ class PaymentController extends Controller
         ], 200);
     }
 
-    /**
-     * Verify Paystack Transaction
-     *
-     * @OA\Post(
-     *     path="/api/payment/verify",
-     *     tags={"Payment"},
-     *     summary="Verify Paystack online transaction and update invoice",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"reference"},
-     *             @OA\Property(property="reference", type="string", example="PAYSTACK-REF-123456"),
-     *             @OA\Property(property="company_id", type="integer", example=1)
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Paystack transaction verified successfully"),
-     *     @OA\Response(response=422, description="Verification failure or invoice mismatch")
-     * )
-     */
     public function verifyOnline(Request $request)
     {
         $request->validate([
@@ -151,25 +105,6 @@ class PaymentController extends Controller
         ], 200);
     }
 
-    /**
-     * Payment History (Company Scoped)
-     *
-     * @OA\Get(
-     *     path="/api/payment/history",
-     *     tags={"Payment"},
-     *     summary="List payment history for authenticated company",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         description="Pagination page number",
-     *         required=false,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Response(response=200, description="Payment history list retrieved successfully"),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
     public function paymentHistory(Request $request)
     {
         $companyId = auth()->user()?->company_id;
@@ -188,27 +123,6 @@ class PaymentController extends Controller
         ]);
     }
 
-    /**
-     * Legacy Stripe Payment (Preserved for backward compatibility)
-     *
-     * @OA\Post(
-     *     path="/api/payment/create",
-     *     tags={"Payment"},
-     *     summary="Create legacy card payment via Stripe",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"amount", "stripeToken"},
-     *             @OA\Property(property="amount", type="number", example=500.00),
-     *             @OA\Property(property="stripeToken", type="string", example="tok_visa"),
-     *             @OA\Property(property="email", type="string", example="buyer@example.com")
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Payment successful"),
-     *     @OA\Response(response=422, description="Validation error")
-     * )
-     */
     public function payment(Request $request)
     {
         $request->validate([

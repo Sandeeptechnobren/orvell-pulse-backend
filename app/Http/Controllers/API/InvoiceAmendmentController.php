@@ -8,12 +8,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
-/**
- * @OA\Tag(
- *     name="Invoice Amendment",
- *     description="Invoice amendment and approval workflow APIs"
- * )
- */
 class InvoiceAmendmentController extends Controller
 {
     protected InvoiceAmendmentService $amendmentService;
@@ -23,32 +17,6 @@ class InvoiceAmendmentController extends Controller
         $this->amendmentService = $amendmentService;
     }
 
-    /**
-     * Submit Invoice Amendment Request
-     *
-     * @OA\Post(
-     *     path="/api/invoices/amendment-request",
-     *     tags={"Invoice Amendment"},
-     *     summary="Submit request to amend an immutable finalized invoice",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"invoice_id", "reason", "requested_changes"},
-     *             @OA\Property(property="invoice_id", type="integer", example=1),
-     *             @OA\Property(property="reason", type="string", example="Price discount approved by manager"),
-     *             @OA\Property(
-     *                 property="requested_changes",
-     *                 type="object",
-     *                 example={"discount_amount": 25.00}
-     *             ),
-     *             @OA\Property(property="company_id", type="integer", example=1)
-     *         )
-     *     ),
-     *     @OA\Response(response=201, description="Invoice amendment request submitted successfully"),
-     *     @OA\Response(response=422, description="Validation error")
-     * )
-     */
     public function requestAmendment(Request $request): JsonResponse
     {
         $request->validate([
@@ -75,31 +43,6 @@ class InvoiceAmendmentController extends Controller
         ], 201);
     }
 
-    /**
-     * Approve Invoice Amendment Request (Admin / Manager Only)
-     *
-     * @OA\Post(
-     *     path="/api/invoices/amendment/{id}/approve",
-     *     tags={"Invoice Amendment"},
-     *     summary="Approve invoice amendment request and generate versioned invoice",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Amendment Request ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=false,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="company_id", type="integer", example=1)
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Invoice amendment approved and new version created"),
-     *     @OA\Response(response=403, description="Unauthorized. Only Admins and Managers can approve")
-     * )
-     */
     public function approveAmendment(Request $request, int $id): JsonResponse
     {
         $user = auth()->user();
@@ -137,33 +80,6 @@ class InvoiceAmendmentController extends Controller
         ], 200);
     }
 
-    /**
-     * Reject Invoice Amendment Request (Admin / Manager Only)
-     *
-     * @OA\Post(
-     *     path="/api/invoices/amendment/{id}/reject",
-     *     tags={"Invoice Amendment"},
-     *     summary="Reject invoice amendment request with stated reason",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Amendment Request ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"rejection_reason"},
-     *             @OA\Property(property="rejection_reason", type="string", example="Amendment rejected due to missing physical bale verification"),
-     *             @OA\Property(property="company_id", type="integer", example=1)
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Invoice amendment request rejected successfully"),
-     *     @OA\Response(response=403, description="Unauthorized. Only Admins and Managers can reject")
-     * )
-     */
     public function rejectAmendment(Request $request, int $id): JsonResponse
     {
         $request->validate([
@@ -210,25 +126,6 @@ class InvoiceAmendmentController extends Controller
         ], 200);
     }
 
-    /**
-     * List Invoice Amendment Requests
-     *
-     * @OA\Get(
-     *     path="/api/invoices/amendment/list",
-     *     tags={"Invoice Amendment"},
-     *     summary="List invoice amendment requests for company",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Parameter(
-     *         name="status",
-     *         in="query",
-     *         description="Filter by request status (pending, approved, rejected)",
-     *         required=false,
-     *         @OA\Schema(type="string", example="pending")
-     *     ),
-     *     @OA\Response(response=200, description="Amendment requests retrieved successfully"),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
     public function listAmendments(Request $request): JsonResponse
     {
         $companyId = auth()->user()?->company_id;

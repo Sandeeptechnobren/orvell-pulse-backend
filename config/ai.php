@@ -33,7 +33,10 @@ return [
     | Execution Parameters
     |--------------------------------------------------------------------------
     */
-    'timeout'     => (int) env('AI_TIMEOUT', 5), // Max 5 seconds for WhatsApp real-time responsiveness
+    'timeout'     => (int) env('AI_TIMEOUT', 15),
     'max_tokens'  => (int) env('AI_MAX_TOKENS', 400),
     'temperature' => (float) env('AI_TEMPERATURE', 0.5),
+
+    // How many previous messages are replayed to the model as conversation context.
+    'history_limit' => (int) env('AI_HISTORY_LIMIT', 10),
 ];

@@ -36,7 +36,7 @@ class AdminHandler
         $this->promptService = $promptService;
     }
 
-    public function handle(string $from, string $t, WhatsappConversation $conv, ?int $adminId = null): array
+    public function handle(string $from, string $t, WhatsappConversation $conv, ?int $adminId = null, ?int $companyId = null): array
     {
         $lc = mb_strtolower(trim($t));
 

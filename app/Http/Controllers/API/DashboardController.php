@@ -17,42 +17,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-/**
- * @OA\Tag(
- *     name="Dashboard",
- *     description="Real-time Operational Dashboard & KPI Analytics APIs"
- * )
- */
 class DashboardController extends Controller
 {
-    /**
-     * Get Real-time Dashboard Overview
-     *
-     * @OA\Get(
-     *     path="/api/dashboard/overview",
-     *     tags={"Dashboard"},
-     *     summary="Retrieve live operational KPIs, cash in till, inventory breakdown, and alerts for company",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Live dashboard overview retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(property="company", type="object"),
-     *                 @OA\Property(property="financials", type="object"),
-     *                 @OA\Property(property="inventory", type="object"),
-     *                 @OA\Property(property="orders", type="object"),
-     *                 @OA\Property(property="low_stock_alerts", type="array", @OA\Items(type="object")),
-     *                 @OA\Property(property="recent_activity", type="array", @OA\Items(type="object"))
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
     public function overview(Request $request): JsonResponse
     {
         $user = auth()->user();

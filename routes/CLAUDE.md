@@ -2,7 +2,7 @@
 
 ## Purpose
 Declares every route the API exposes plus console commands. `api.php` is the single
-source of truth for endpoints (the Swagger `@OA` annotations in controllers are
+source of truth for endpoints (the annotations in controllers were
 unreliable and sometimes describe different paths).
 
 ## Key files

@@ -22,12 +22,21 @@ Route::get('Country',[CountryController::class,'countries']);
 Route::post('whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);          // simple/test shape
 Route::post('whatsapp/chatterly', [WhatsAppWebhookController::class, 'chatterly']);     // real Chatterly gateway payload
 
+// One endpoint per WhatsApp instance so the URL declares the role.
+Route::post('whatsapp/customer', [WhatsAppWebhookController::class, 'customer']);
+Route::post('whatsapp/admin',    [WhatsAppWebhookController::class, 'admin']);
+
 // Paystack payment webhook (charge.success → mark order paid + WhatsApp confirmation)
 Route::post('webhooks/paystack', [\App\Http\Controllers\API\PaystackWebhookController::class, 'handle']);
 
 Route::middleware('auth:sanctum')->group(function () {
   Route::post('logout', [AuthController::class, 'logout']);
   Route::post('logoutall', [AuthController::class, 'logoutall']);
+
+  Route::prefix('whatsapp')->group(function () {
+    Route::get('/messages', [\App\Http\Controllers\API\WhatsAppLedgerController::class, 'index']);
+    Route::get('/messages/{waId}', [\App\Http\Controllers\API\WhatsAppLedgerController::class, 'conversation'])->where('waId', '.*');
+  });
    
 Route::prefix('Stocks')->group(function () { 
    Route::get('/list', [StockManagementController::class, 'index']);

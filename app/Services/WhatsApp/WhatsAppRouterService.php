@@ -4,7 +4,6 @@ namespace App\Services\WhatsApp;
 
 use App\Models\Company;
 use App\Models\WhatsappConversation;
-use App\Models\WhatsappMessage;
 use App\Services\WhatsApp\Handlers\BuyerHandler;
 use App\Services\WhatsApp\Handlers\StaffHandler;
 use App\Services\WhatsApp\Handlers\CashierHandler;
@@ -59,10 +58,10 @@ class WhatsAppRouterService
         $from = trim($from);
         $message = trim($message);
 
-        // $targetCompanyId = $companyId ?? Company::first()?->id ?? 1;
+        $companyId = $companyId ?? Company::first()?->id ?? 1;
 
-        // 1. Record Inbound Message in ledger
-        $this->recordMessage($from, 'system', 'inbound', $message);
+        // Inbound is recorded by the webhook service and outbound by WhatsAppSender,
+        // which is the only place that knows whether the send succeeded.
 
         // 2. Resolve or initialize persistent conversation state
         $normalizedRole = in_array($role, ['admin', 'cashier', 'staff'], true) ? $role : 'buyer';
@@ -71,7 +70,7 @@ class WhatsAppRouterService
         // 3. Delegate to Dedicated Role Handler
         switch ($normalizedRole) {
             case 'admin':
-                $result = $this->adminHandler->handle($from, $message, $conversation, $actorUserId);
+                $result = $this->adminHandler->handle($from, $message, $conversation, $actorUserId, $companyId);
                 break;
             case 'cashier':
                 $result = $this->cashierHandler->handle($from, $message, $conversation, $actorUserId);
@@ -84,9 +83,6 @@ class WhatsAppRouterService
                 $result = $this->buyerHandler->handle($from, $message, $conversation);
                 break;
         }
-
-        // 4. Record Outbound Message in ledger
-        $this->recordMessage('system', $from, 'outbound', $result['reply']);
 
         // 5. Update last interaction timestamp
         $conversation->update(['last_interaction_at' => now()]);
@@ -106,19 +102,4 @@ class WhatsAppRouterService
         );
     }
 
-    private function recordMessage(string $sender, string $recipient, string $direction, string $body): void
-    {
-        try {
-            WhatsappMessage::create([
-                'sender_wa_id'    => $sender,
-                'recipient_wa_id' => $recipient,
-                'direction'       => $direction,
-                'message_body'    => $body,
-                'message_type'    => 'text',
-                'status'          => 'delivered',
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('[whatsapp-router] failed to log message: ' . $e->getMessage());
-        }
-    }
 }

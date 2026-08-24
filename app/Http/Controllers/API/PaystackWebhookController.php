@@ -12,12 +12,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
-/**
- * @OA\Tag(
- *     name="Paystack Webhook",
- *     description="Paystack HMAC verified payment webhook handler"
- * )
- */
 class PaystackWebhookController extends Controller
 {
     protected PaymentService $paymentService;
@@ -27,46 +21,6 @@ class PaystackWebhookController extends Controller
         $this->paymentService = $paymentService;
     }
 
-    /**
-     * Process Paystack Inbound Webhook
-     *
-     * @OA\Post(
-     *     path="/api/webhooks/paystack",
-     *     tags={"Paystack Webhook"},
-     *     summary="Inbound Paystack webhook for automated payment settlement",
-     *     @OA\Parameter(
-     *         name="x-paystack-signature",
-     *         in="header",
-     *         description="HMAC SHA512 signature of request payload computed using secret key",
-     *         required=true,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"event", "data"},
-     *             @OA\Property(property="event", type="string", example="charge.success"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(property="reference", type="string", example="PAYSTACK-REF-123456"),
-     *                 @OA\Property(property="amount", type="integer", example=35000),
-     *                 @OA\Property(property="currency", type="string", example="GHS"),
-     *                 @OA\Property(property="status", type="string", example="success"),
-     *                 @OA\Property(
-     *                     property="metadata",
-     *                     type="object",
-     *                     @OA\Property(property="order_id", type="integer", example=1),
-     *                     @OA\Property(property="invoice_id", type="integer", example=1)
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Webhook processed successfully"),
-     *     @OA\Response(response=400, description="Invalid HMAC signature or validation error"),
-     *     @OA\Response(response=500, description="Server processing error")
-     * )
-     */
     public function handle(Request $request, ChatterlyService $chatterly): JsonResponse
     {
         $rawPayload = $request->getContent();

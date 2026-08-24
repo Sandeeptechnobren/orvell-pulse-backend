@@ -769,10 +769,10 @@ RULES;
         $dynamicContext = $this->assembleDynamicContext($promptFor, $companyId, $from, $context);
 
         // 2. Fetch isolated conversation memory
-        $history = $this->getRecentConversationHistory($from, 6);
+        $history = $this->getRecentConversationHistory($from, (int) config('ai.history_limit', 10));
 
         // 3. Build 6-layer system instruction
-        $clientId = $companyId;
+        $clientId = $context['client_id'] ?? $companyId;
         $systemInstruction = $this->buildFullSystemInstruction($promptFor, $clientId, $companyId, $dynamicContext);
 
         // 4. Invoke AI Completion Service

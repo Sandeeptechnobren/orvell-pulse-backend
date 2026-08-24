@@ -14,6 +14,7 @@ use App\Services\PaystackService;
 use App\Services\AuditService;
 use App\Services\InventoryService;
 use App\Services\AgentPromptService;
+use App\Services\WhatsAppCustomerRegistry;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -134,28 +135,7 @@ class BuyerHandler
             return ['action' => 'payment_link', 'reply' => "💳 *Pay for Order #{$order->order_no}*\nAmount: {$this->defaultCurrency} " . number_format((float) $order->total_amount, 2) . "\n\n👉 Tap here to pay securely:\n{$pay['url']}\n\nYou will receive pickup confirmation as soon as payment is verified ✅"];
         }
 
-        // 7. Check Order Status / Pickup Code: "status" or "pickup"
-        if (str_contains($lc, 'status') || str_contains($lc, 'pickup') || str_contains($lc, 'code')) {
-            $latestOrder = Order::where('buyer_id', $buyer->id)->latest()->first();
-            if (!$latestOrder) {
-                return ['action' => 'replied', 'reply' => "No order history found for your account. Reply *shop* to start shopping."];
-            }
-
-            return ['action' => 'order_status', 'reply' => "📦 *Order #{$latestOrder->order_no}*\nTotal: {$this->defaultCurrency} " . number_format((float) $latestOrder->total_amount, 2) . "\nPayment: *{$latestOrder->payment_status}*\nPickup Status: *{$latestOrder->pickup_status}*\nPickup Code: *{$latestOrder->pickup_code}*"];
-        }
-
-        // 8. Browse / Shop Categories
-        if (str_contains($lc, 'shop') || str_contains($lc, 'catalog') || str_contains($lc, 'browse') || str_contains($lc, 'menu') || str_contains($lc, 'items') || str_contains($lc, 'stock')) {
-            return $this->categoriesList(1);
-        }
-
-        // 9. Greeting
-        if (in_array($lc, ['hi', 'hello', 'hey', 'start', 'good morning', 'good evening', 'good afternoon'], true)) {
-            $name = $buyer->name ? " {$buyer->name}" : '';
-            return ['action' => 'greeting', 'reply' => "👋 *Welcome to Orvell Wholesale*{$name}!\n\nReply *shop* to view available bale categories, or send a *category name* to order."];
-        }
-
-        // 10. Direct Category selection
+        // 7. Direct Category selection — primes the quantity step above.
         $cat = $this->findCategory($t);
         if ($cat) {
             $avail = Bale::where('item_category_id', $cat->id)
@@ -178,10 +158,11 @@ class BuyerHandler
             }
         }
 
-        // // Fallback
-        // return ['action' => 'help', 'reply' => "🤖 *How can I help you?*\n• *shop* — browse available bales\n• *order <category> <qty>* — place quick order\n• *pay* — pay for latest pending order\n• *pickup* — get your pickup code\n• *support* — talk to a human"];
-        // 11. Conversational & Custom IQ Prompt Delegation
-        return $this->promptService->handleConversationalMessage('customer', $from, $t, 1, ['buyer_id' => $buyer->id]);
+        // Everything else — greetings, catalogue questions, order status, free-form text — is
+        // answered by the AI using the configured customer prompt and the recent conversation.
+        return $this->promptService->handleConversationalMessage('customer', $from, $t, 1, [
+            'buyer_id' => $buyer->id,
+        ]);
     }
 
     private function placeOrder(Buyer $buyer, string $categoryOrName, int $qty, int $companyId): array
@@ -238,33 +219,11 @@ class BuyerHandler
         }
     }
 
-    private function categoriesList(int $companyId): array
+private function resolveBuyer(string $from, int $companyId): Buyer
     {
-        $categories = Item_category::all();
-        $lines = [];
-
-        foreach ($categories as $cat) {
-            $count = Bale::where('item_category_id', $cat->id)
-                ->where('company_id', $companyId)
-                ->where('status', 'available')
-                ->count();
-
-            if ($count > 0) {
-                $lines[] = "• *{$cat->category_name}* ({$count} bales available)";
-            }
-        }
-
-        if (empty($lines)) {
-            return ['action' => 'replied', 'reply' => "📦 New containers arriving soon! Please check back shortly."];
-        }
-
-        $list = implode("\n", $lines);
-        return ['action' => 'catalogue', 'reply' => "🗂️ *Available Bale Categories*\n\n{$list}\n\nTo order, reply with the *category name* (e.g. *{$categories->first()->category_name}*) or *order <category> <qty>*."];
-    }
-
-    private function resolveBuyer(string $from, int $companyId): Buyer
-    {
-        $buyer = Buyer::where('whatsapp_number', $from)
+        // Identity lives in wa_id (the full chat id). whatsapp_number holds only a real
+        // dialable number, which is null for @lid senders, so it cannot be the lookup key.
+        $buyer = Buyer::where('wa_id', $from)
             ->where('company_id', $companyId)
             ->first();
 
@@ -272,7 +231,8 @@ class BuyerHandler
             $buyer = Buyer::create([
                 'company_id'      => $companyId,
                 'name'            => 'WhatsApp Buyer ' . substr(preg_replace('/[^0-9]/', '', $from), -4),
-                'whatsapp_number' => $from,
+                'wa_id'           => $from,
+                'whatsapp_number' => WhatsAppCustomerRegistry::phoneFrom($from),
             ]);
         }
 
@@ -285,7 +245,7 @@ class BuyerHandler
         if (!$customer) {
             $customer = Customer::create([
                 'wa_id'             => $waId,
-                'whatsapp_number'   => $waId,
+                'whatsapp_number'   => WhatsAppCustomerRegistry::phoneFrom($waId),
                 'name'              => 'WhatsApp ' . substr(preg_replace('/[^0-9]/', '', $waId), -4),
                 'address'           => 'WhatsApp',
                 'onboarding_status' => 0,

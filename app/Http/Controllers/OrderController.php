@@ -18,26 +18,6 @@ class OrderController extends Controller
         $this->saleService = $saleService;
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/orders/create",
-     *     tags={"Orders"},
-     *     summary="Create new sale / order",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"buyer_id", "items"},
-     *             @OA\Property(property="buyer_id", type="integer", example=1),
-     *             @OA\Property(property="items", type="array", @OA\Items(
-     *                 @OA\Property(property="item_category_id", type="integer", example=1),
-     *                 @OA\Property(property="quantity", type="integer", example=2)
-     *             ))
-     *         )
-     *     ),
-     *     @OA\Response(response=201, description="Order created successfully")
-     * )
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -58,18 +38,6 @@ class OrderController extends Controller
         ], 201);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/orders/list",
-     *     tags={"Orders"},
-     *     summary="Get all orders",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Orders fetched successfully"
-     *     )
-     * )
-     */
     public function index()
     {
         $orders = $this->service->list(); // must return paginate()
@@ -86,28 +54,6 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/orders/show/{uuid}",
-     *     tags={"Orders"},
-     *     summary="Get order by UUID",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Parameter(
-     *         name="uuid",
-     *         in="path",
-     *         required=true,
-     *         description="Order UUID"
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Order fetched successfully"
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Order not found"
-     *     )
-     * )
-     */
     public function show(string $uuid)
     {
         $order = $this->service->getByUuid($uuid);

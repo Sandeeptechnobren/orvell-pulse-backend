@@ -16,12 +16,6 @@ use App\Services\OtpService;
 use App\Services\AuditService;
 use OpenApi\Annotations as OA;
 
-/**
- * @OA\Tag(
- *     name="Orvell Auth",
- *     description="Authentication, Signup, Login & Password Reset APIs"
- * )
- */
 class AuthController extends Controller
 {
     use ResponseTrait;
@@ -35,32 +29,6 @@ class AuthController extends Controller
         $this->auditService = $auditService;
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/signup",
-     *     tags={"Orvell Auth"},
-     *     summary="Register client & verify email using native Laravel SMTP OTP",
-     *     description="
-     * STEP 1: Send name, business details, email, password → OTP sent to email via native SMTP  
-     * STEP 2: Send email + otp → signup completed, token issued
-     * ",
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="name", type="string", example="John Doe"),
-     *             @OA\Property(property="business_name", type="string", example="Orvell Space"),
-     *             @OA\Property(property="business_location", type="string", example="Accra"),
-     *             @OA\Property(property="phone_number", type="string", example="+233240000001"),
-     *             @OA\Property(property="email", type="string", format="email", example="test@orvell.com"),
-     *             @OA\Property(property="password", type="string", example="password123"),
-     *             @OA\Property(property="otp", type="string", example="123456")
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="OTP sent or signup completed"),
-     *     @OA\Response(response=400, description="Invalid request / Invalid OTP / OTP expired"),
-     *     @OA\Response(response=500, description="Server error")
-     * )
-     */
     public function register(Request $request)
     {
         /**
@@ -174,23 +142,6 @@ class AuthController extends Controller
         ], 400);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/signin",
-     *     tags={"Orvell Auth"},
-     *     summary="Client / Staff login",
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"email","password"},
-     *             @OA\Property(property="email", type="string", example="test@orvell.com"),
-     *             @OA\Property(property="password", type="string", example="password123")
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Login successful"),
-     *     @OA\Response(response=401, description="Invalid credentials")
-     * )
-     */
     public function login(Request $request)
     {
         $request->validate([
@@ -240,16 +191,6 @@ class AuthController extends Controller
         ], 401);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/tokenCheck",
-     *     tags={"Orvell Auth"},
-     *     summary="Verify token validity and return authenticated user context",
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(response=200, description="Token is valid"),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
     public function tokenCheck(Request $request)
     {
         $user = $request->user() ?? auth('sanctum')->user();
@@ -269,17 +210,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/logout",
-     *     tags={"Orvell Auth"},
-     *     summary="Logout client / user",
-     *     description="Revokes the current access token",
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(response=200, description="Logged out successfully"),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
     public function logout(Request $request)
     {
         $user = $request->user() ?? auth('sanctum')->user();
@@ -298,16 +228,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/logoutall",
-     *     tags={"Orvell Auth"},
-     *     summary="Logout from all devices",
-     *     description="Revokes all access tokens for the authenticated user",
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(response=200, description="Logged out from all sessions successfully")
-     * )
-     */
     public function logoutall(Request $request)
     {
         $user = $request->user() ?? auth('sanctum')->user();
@@ -326,25 +246,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/password-reset",
-     *     tags={"Orvell Auth"},
-     *     summary="Password reset flow using native SMTP OTP",
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="email", type="string", example="test@orvell.com"),
-     *             @OA\Property(property="otp", type="string", example="123456"),
-     *             @OA\Property(property="new_password", type="string", example="newpassword123")
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Password reset flow success"),
-     *     @OA\Response(response=400, description="Invalid or expired OTP"),
-     *     @OA\Response(response=404, description="Email not registered"),
-     *     @OA\Response(response=500, description="Server error")
-     * )
-     */
     public function passwordResetFlow(Request $request)
     {
         try {

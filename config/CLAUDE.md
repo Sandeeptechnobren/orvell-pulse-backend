@@ -2,7 +2,7 @@
 
 ## Purpose
 16 Laravel config files defining DB connections, auth/Sanctum, CORS, queue/cache/session
-drivers, mail, and the Swagger generator. Values are pulled from `.env`.
+drivers and mail. Values are pulled from `.env`.
 
 ## Key files
 - `database.php` — 5 connections; default `sqlite` (MySQL in prod).
@@ -11,7 +11,6 @@ drivers, mail, and the Swagger generator. Values are pulled from `.env`.
 - `cors.php` — ⚠ `allowed_origins => ['*']` (wildcard).
 - `services.php` — postmark/resend/ses/slack stubs; ⚠ no Stripe/WHAPI entries.
 - `permission.php` — spatie config (installed but dormant; no model uses `HasRoles`).
-- `l5-swagger.php` — "Orvell Backend API Documentation"; UI at `/api/documentation`.
 - `queue.php` / `cache.php` / `session.php` — all default to the `database` driver.
 - `mail.php` — default `log` mailer. `passport.php` — ⚠ orphaned (Passport not installed).
 
@@ -28,4 +27,3 @@ credentials in `services.php` (e.g. add `stripe`, `whapi` keys).
 
 ## Common commands
 - `php artisan config:clear` · `php artisan config:cache`
-- `php artisan l5-swagger:generate`

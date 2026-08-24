@@ -8,17 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-/**
- * @OA\Schema(
- *     schema="StockManagement",
- *     type="object",
- *     @OA\Property(property="uuid", type="string", example="550e8400-e29b-41d4-a716-446655440000"),
- *     @OA\Property(property="name", type="string", example="Summer Dresses Grade A"),
- *     @OA\Property(property="stock", type="integer", example=50),
- *     @OA\Property(property="price", type="number", example=250.00),
- *     @OA\Property(property="created_at", type="string", example="2026-01-01 10:00:00")
- * )
- */
 class StockManagement extends Model
 {
     use SoftDeletes;

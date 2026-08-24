@@ -8,12 +8,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
-/**
- * @OA\Tag(
- *     name="Bank Deposits",
- *     description="Cashier Bank Deposit Management APIs"
- * )
- */
 class BankDepositController extends Controller
 {
     protected BankDepositService $depositService;
@@ -23,33 +17,6 @@ class BankDepositController extends Controller
         $this->depositService = $depositService;
     }
 
-    /**
-     * Record Bank Deposit (Cashier / Admin)
-     *
-     * @OA\Post(
-     *     path="/api/bank-deposits/create",
-     *     tags={"Bank Deposits"},
-     *     summary="Record cashier bank deposit of counter cash",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"amount", "bank_name"},
-     *             @OA\Property(property="amount", type="number", example=500.00),
-     *             @OA\Property(property="bank_name", type="string", example="GCB Bank"),
-     *             @OA\Property(property="account_number", type="string", example="1029384756"),
-     *             @OA\Property(property="reference_number", type="string", example="DEP-2026-001"),
-     *             @OA\Property(property="deposit_date", type="string", format="date", example="2026-08-09"),
-     *             @OA\Property(property="deposit_slip_image", type="string", example="https://storage.orvell.com/slips/slip1.jpg"),
-     *             @OA\Property(property="notes", type="string", example="Morning till cash deposit"),
-     *             @OA\Property(property="company_id", type="integer", example=1)
-     *         )
-     *     ),
-     *     @OA\Response(response=201, description="Bank deposit recorded successfully"),
-     *     @OA\Response(response=403, description="Unauthorized. Only authorized Cashiers, Managers, and Admins can record bank deposits"),
-     *     @OA\Response(response=422, description="Validation error or duplicate reference")
-     * )
-     */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
@@ -101,39 +68,6 @@ class BankDepositController extends Controller
         ], 201);
     }
 
-    /**
-     * List Bank Deposits
-     *
-     * @OA\Get(
-     *     path="/api/bank-deposits/list",
-     *     tags={"Bank Deposits"},
-     *     summary="List filtered bank deposits for authenticated company",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Parameter(
-     *         name="bank_name",
-     *         in="query",
-     *         description="Filter by bank name",
-     *         required=false,
-     *         @OA\Schema(type="string", example="GCB Bank")
-     *     ),
-     *     @OA\Parameter(
-     *         name="start_date",
-     *         in="query",
-     *         description="Filter start date (YYYY-MM-DD)",
-     *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2026-08-01")
-     *     ),
-     *     @OA\Parameter(
-     *         name="end_date",
-     *         in="query",
-     *         description="Filter end date (YYYY-MM-DD)",
-     *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2026-08-31")
-     *     ),
-     *     @OA\Response(response=200, description="Bank deposits list retrieved successfully"),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
     public function index(Request $request): JsonResponse
     {
         $companyId = auth()->user()?->company_id;
@@ -147,32 +81,6 @@ class BankDepositController extends Controller
         ], 200);
     }
 
-    /**
-     * Bank Deposits Period Summary
-     *
-     * @OA\Get(
-     *     path="/api/bank-deposits/summary",
-     *     tags={"Bank Deposits"},
-     *     summary="Get bank deposit summary aggregated by bank for date range",
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Parameter(
-     *         name="start_date",
-     *         in="query",
-     *         description="Summary start date (YYYY-MM-DD)",
-     *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2026-08-01")
-     *     ),
-     *     @OA\Parameter(
-     *         name="end_date",
-     *         in="query",
-     *         description="Summary end date (YYYY-MM-DD)",
-     *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2026-08-31")
-     *     ),
-     *     @OA\Response(response=200, description="Bank deposit summary retrieved successfully"),
-     *     @OA\Response(response=401, description="Unauthenticated")
-     * )
-     */
     public function summary(Request $request): JsonResponse
     {
         $companyId = auth()->user()?->company_id;
