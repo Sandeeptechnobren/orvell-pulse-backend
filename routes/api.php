@@ -10,17 +10,21 @@ use App\Http\Controllers\CustomerManagementController;
 use App\Http\Controllers\API\WhatsappMessageController;
 use App\Http\Controllers\API\WhatsAppWebhookController;
 use App\Http\Controllers\CountryController;
+use App\Http\Controllers\AgentInteractionController\GetMessageWebhookController;
+use App\Http\Controllers\API\PickupController;
+use App\Http\Controllers\API\InvoiceAmendmentController;
+use App\Http\Controllers\API\ExpenseController;
+
 Route::post('signup', [AuthController::class, 'register']);
+
 Route::post('signin', [AuthController::class, 'login']);
 Route::post('/signup/verify-otp',[AuthController::class,'register']);
 Route::post('tokenCheck', [AuthController::class, 'tokenCheck']);
-//Route::post('password/change', [AuthController::class, 'changePassword']);
 Route::post('/password-reset', [AuthController::class, 'passwordResetFlow']);
 Route::get('Country',[CountryController::class,'countries']);
 
-// WhatsApp inbound webhook (Chatterly → admin stock management / customer orders)
-Route::post('whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);          // simple/test shape
-Route::post('whatsapp/chatterly', [WhatsAppWebhookController::class, 'chatterly']);     // real Chatterly gateway payload
+//webhook
+Route::post('/webhook/receive', [GetMessageWebhookController::class, 'receive']);
 
 // One endpoint per WhatsApp instance so the URL declares the role.
 Route::post('whatsapp/customer', [WhatsAppWebhookController::class, 'customer']);
@@ -72,19 +76,19 @@ Route::prefix('item-category')->group(function () {
     Route::get('/history', [PaymentController::class, 'paymentHistory'])->name('payment.history');
   }); 
   Route::prefix('invoices')->group(function(){
-    Route::post('/amendment-request', [\App\Http\Controllers\API\InvoiceAmendmentController::class, 'requestAmendment'])->name('invoices.amendment.request');
-    Route::post('/amendment/{id}/approve', [\App\Http\Controllers\API\InvoiceAmendmentController::class, 'approveAmendment'])->name('invoices.amendment.approve');
-    Route::post('/amendment/{id}/reject', [\App\Http\Controllers\API\InvoiceAmendmentController::class, 'rejectAmendment'])->name('invoices.amendment.reject');
-    Route::get('/amendment/list', [\App\Http\Controllers\API\InvoiceAmendmentController::class, 'listAmendments'])->name('invoices.amendment.list');
+    Route::post('/amendment-request', [InvoiceAmendmentController::class, 'requestAmendment'])->name('invoices.amendment.request');
+    Route::post('/amendment/{id}/approve', [InvoiceAmendmentController::class, 'approveAmendment'])->name('invoices.amendment.approve');
+    Route::post('/amendment/{id}/reject', [InvoiceAmendmentController::class, 'rejectAmendment'])->name('invoices.amendment.reject');
+    Route::get('/amendment/list', [InvoiceAmendmentController::class, 'listAmendments'])->name('invoices.amendment.list');
   });
   Route::prefix('pickup')->group(function(){
-    Route::post('/validate', [\App\Http\Controllers\API\PickupController::class, 'validateCode'])->name('pickup.validate');
-    Route::post('/release', [\App\Http\Controllers\API\PickupController::class, 'releaseBales'])->name('pickup.release');
+    Route::post('/validate', [PickupController::class, 'validateCode'])->name('pickup.validate');
+    Route::post('/release', [PickupController::class, 'releaseBales'])->name('pickup.release');
   });
   Route::prefix('expenses')->group(function(){
-    Route::post('/create', [\App\Http\Controllers\API\ExpenseController::class, 'store'])->name('expenses.store');
-    Route::get('/list', [\App\Http\Controllers\API\ExpenseController::class, 'index'])->name('expenses.index');
-    Route::get('/summary', [\App\Http\Controllers\API\ExpenseController::class, 'summary'])->name('expenses.summary');
+    Route::post('/create', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::get('/list', [ExpenseController::class, 'index'])->name('expenses.index');
+    Route::get('/summary', [ExpenseController::class, 'summary'])->name('expenses.summary');
   });
   Route::prefix('bank-deposits')->group(function(){
     Route::post('/create', [\App\Http\Controllers\API\BankDepositController::class, 'store'])->name('bank_deposits.store');

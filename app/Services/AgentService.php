@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 
 class AgentService
 {
@@ -12,9 +13,45 @@ class AgentService
     ) {
     }
 
-    public function initialise(string $agentType)
+public function initialise(string $agentType)
     {
-        return $this->messages->initialiseAgent($agentType);
+        if($agentType=="customer"){
+        $customer_token = config('services.customer_whapi.token');
+        $response = Http::withHeaders([
+            'accept' => 'application/json',
+            'authorization' => 'Bearer ' . $customer_token,
+        ])->get('https://gate.whapi.cloud/users/login', [
+            'wakeup' => 'true',
+        ]);
+        if ($response->successful()) {
+            $data = $response->json();
+            return $data;
+        }
+        return [
+            'success' => false,
+            'status' => $response->status(),
+            'message' => $response->body(),
+        ];
+        }
+        else{
+        // $admin_token = config('services.admin_whapi.token');
+        // $response = Http::withHeaders([
+        //     'accept' => 'application/json',
+        //     'authorization' => 'Bearer ' . $admin_token,
+        // ])->get('https://gate.whapi.cloud/users/login', [
+        //     'wakeup' => 'true',
+        // ]);
+        // if ($response->successful()) {
+        //     $data = $response->json();
+        //     return $data;
+        // }
+        return [
+            'success' => false,
+            // 'status' => $response->status(),
+            // 'message' => $response->body(),
+            'message'=>"Admin Configuration in Progress! Please try again a later."
+        ];
+        }
     }
 
     public function savePrompt(string $promptFor, string $description)

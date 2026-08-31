@@ -100,7 +100,7 @@ class MessageService
 //         'response' => $qrResponse->body(),
 //     ], 500);
 // }
-    public function initialiseAgent($agentType)
+public function initialiseAgent($agentType)
     {
         $user = Auth::user();
 

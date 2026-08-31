@@ -34,5 +34,15 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'customer_whapi' => [
+        'token' => env('CUSTOMER_WHAPI_TOKEN'),
+    ],
+    'whapi' => [
+        'base_url' => env(
+            'WHAPI_BASE_URL',
+            'https://gate.whapi.cloud'
+        ),
+        // 'token' => env('CUSTOMER_WHAPI_TOKEN'),
+    ],
 
 ];

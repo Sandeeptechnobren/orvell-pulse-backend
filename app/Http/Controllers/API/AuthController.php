@@ -18,19 +18,21 @@ use OpenApi\Annotations as OA;
 
 class AuthController extends Controller
 {
+    
     use ResponseTrait;
 
-    protected OtpService $otpService;
-    protected AuditService $auditService;
+    // protected OtpService $otpService;
+    // protected AuditService $auditService;
 
-    public function __construct(OtpService $otpService, AuditService $auditService)
-    {
-        $this->otpService = $otpService;
-        $this->auditService = $auditService;
-    }
+    // public function __construct(OtpService $otpService, AuditService $auditService)
+    // {
+    //     $this->otpService = $otpService;
+    //     $this->auditService = $auditService;
+    // }
 
     public function register(Request $request)
     {
+
         /**
          * STEP 1: Register & Send OTP
          */
@@ -142,54 +144,105 @@ class AuthController extends Controller
         ], 400);
     }
 
+    // public function login(Request $request)
+    // {
+    //     $request->validate([
+    //         'email'    => 'required|email',
+    //         'password' => 'required',
+    //     ]);
+
+    //     // 1. Try Client authentication
+    //     $client = Client::where('email', $request->email)->first();
+    //     if ($client && Hash::check($request->password, $client->password)) {
+    //         $token = $client->createToken('api_token', ['*'], now()->addDays(7))->plainTextToken;
+
+    //         $this->auditService->log(
+    //             action: 'auth.login_client',
+    //             auditable: $client
+    //         );
+
+    //         return response()->json([
+    //             'status'  => true,
+    //             'message' => 'Signin successful',
+    //             'user'    => $client,
+    //             'token'   => $token,
+    //         ], 200);
+    //     }
+
+    //     // 2. Try User (Staff/Cashier/Admin) authentication
+    //     $user = User::where('email', $request->email)->first();
+    //     if ($user && Hash::check($request->password, $user->password)) {
+    //         $token = $user->createToken('api_token', ['*'], now()->addDays(7))->plainTextToken;
+
+    //         $this->auditService->log(
+    //             action: 'auth.login_user',
+    //             auditable: $user
+    //         );
+
+    //         return response()->json([
+    //             'status'  => true,
+    //             'message' => 'Signin successful',
+    //             'user'    => $user,
+    //             'token'   => $token,
+    //         ], 200);
+    //     }
+
+    //     return response()->json([
+    //         'status'  => false,
+    //         'message' => 'Invalid credentials',
+    //     ], 401);
+    // }
     public function login(Request $request)
-    {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required',
-        ]);
+{
+    $request->validate([
+        'email'    => 'required|email',
+        'password' => 'required',
+    ]);
 
-        // 1. Try Client authentication
-        $client = Client::where('email', $request->email)->first();
-        if ($client && Hash::check($request->password, $client->password)) {
-            $token = $client->createToken('api_token', ['*'], now()->addDays(7))->plainTextToken;
+    // Try Client login
+    $client = Client::where('email', $request->email)->first();
 
-            $this->auditService->log(
-                action: 'auth.login_client',
-                auditable: $client
-            );
+    if ($client && Hash::check($request->password, $client->password)) {
 
-            return response()->json([
-                'status'  => true,
-                'message' => 'Signin successful',
-                'user'    => $client,
-                'token'   => $token,
-            ], 200);
-        }
-
-        // 2. Try User (Staff/Cashier/Admin) authentication
-        $user = User::where('email', $request->email)->first();
-        if ($user && Hash::check($request->password, $user->password)) {
-            $token = $user->createToken('api_token', ['*'], now()->addDays(7))->plainTextToken;
-
-            $this->auditService->log(
-                action: 'auth.login_user',
-                auditable: $user
-            );
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'Signin successful',
-                'user'    => $user,
-                'token'   => $token,
-            ], 200);
-        }
+        $token = $client->createToken(
+            'api_token',
+            ['*'],
+            now()->addDays(7)
+        )->plainTextToken;
 
         return response()->json([
-            'status'  => false,
-            'message' => 'Invalid credentials',
-        ], 401);
+            'status'  => true,
+            'message' => 'Signin successful',
+            'user'    => $client,
+            'token'   => $token,
+        ], 200);
     }
+
+    // Try Staff/Admin/User login
+    $user = User::where('email', $request->email)->first();
+
+    if ($user && Hash::check($request->password, $user->password)) {
+
+        $token = $user->createToken(
+            'api_token',
+            ['*'],
+            now()->addDays(7)
+        )->plainTextToken;
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Signin successful',
+            'user'    => $user,
+            'token'   => $token,
+        ], 200);
+    }
+
+    // Invalid credentials
+    return response()->json([
+        'status'  => false,
+        'message' => 'Invalid credentials',
+    ], 401);
+}
 
     public function tokenCheck(Request $request)
     {

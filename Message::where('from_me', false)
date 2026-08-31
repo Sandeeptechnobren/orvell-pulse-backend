@@ -1,0 +1,19 @@
+[90m= [39m[34;4mApp\Models\Message[39;24m {#6167
+    [34mid[39m: [35m43[39m,
+    [34mconversation_id[39m: [35m2[39m,
+    [34mmessage_id[39m: "[32mrKyMxpGlbdLXFnF3FJ3wHw-hbzdlwkA4L0[39m",
+    [34msender[39m: "[32m919695114515[39m",
+    [34msender_type[39m: "[32mcustomer[39m",
+    [34mfrom_me[39m: [35m0[39m,
+    [34mtype[39m: "[32mtext[39m",
+    [34mmessage_timestamp[39m: [35m1787934936[39m,
+    [34msource[39m: "[32mmobile[39m",
+    [34mchat_id[39m: "[32m919695114515@s.whatsapp.net[39m",
+    [34mtext[39m: "[32mHeogke[39m",
+    [34mfrom_name[39m: "[32mSandeep[39m",
+    [34mpayload[39m: "[32m{"id": "rKyMxpGlbdLXFnF3FJ3wHw-hbzdlwkA4L0", "from": "919695114515", "text": {"body": "Heogke"}, "type": "text", "source": "mobile", "chat_id": "919695114515@s.whatsapp.net", "from_me": false, "starred": false, "from_name": "Sandeep", "timestamp": 1787934936}[39m",
+    [34mprocessed_at[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2026-08-28 16:35:38[39m",
+    [34mupdated_at[39m: "[32m2026-08-28 16:35:38[39m",
+  }
+

@@ -18,9 +18,6 @@ class WhatsappMessageController extends Controller
     {
     }
 
-    /**
-     * Returns the QR image when the instance still needs linking, otherwise JSON.
-     */
     public function initialiseAgent(AgentInstanceRequest $request)
     {
         return $this->service->initialise($request->agentType());
