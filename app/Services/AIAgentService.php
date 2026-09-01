@@ -15,37 +15,31 @@ class AIAgentService
         if (!$this->isConfigured()) {
             return $this->defaultResponse();
         }
-
         $input = [];
-
         foreach ($history as $message) {
             $input[] = [
                 'role' => $message['role'],
                 'content' => $message['content'],
             ];
         }
-
         foreach ($currentMessages as $message) {
             $input[] = [
                 'role' => $message['role'],
                 'content' => $message['content'],
             ];
         }
-
         $response = OpenAI::responses()->create([
-            'model' => config('openai.model', env('OPENAI_MODEL')),
+            // 'model' => config('openai.model', env('OPENAI_MODEL')),
+            'model' => config('ai.openai.model'),
             'instructions' => $systemPrompt,
             'input' => $input,
         ]);
-
         $output = $response->outputText;
-
         if (!$output) {
             throw new RuntimeException(
                 'OpenAI returned an empty response.'
             );
         }
-
         return $output;
     }
 

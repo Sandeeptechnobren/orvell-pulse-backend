@@ -16,7 +16,6 @@ use App\Http\Controllers\API\InvoiceAmendmentController;
 use App\Http\Controllers\API\ExpenseController;
 
 Route::post('signup', [AuthController::class, 'register']);
-
 Route::post('signin', [AuthController::class, 'login']);
 Route::post('/signup/verify-otp',[AuthController::class,'register']);
 Route::post('tokenCheck', [AuthController::class, 'tokenCheck']);

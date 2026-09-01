@@ -23,7 +23,6 @@ class GetMessageWebhookService
                 }
                 $storedMessages = 0;
                 $conversationIds = [];
-
                 DB::transaction(function () use (
                     $payload,
                     $channelId,
@@ -31,31 +30,14 @@ class GetMessageWebhookService
                     &$conversationIds
                 ) {
                     foreach ($payload['messages'] as $messageData) {
-
                         $sender = $messageData['from'] ?? null;
-
                         if (!$sender) {
                             continue;
                         }
-
                         $messageId = $messageData['id'] ?? null;
-
                         if (!$messageId) {
                             continue;
                         }
-
-                        // $conversation = Conversation::firstOrCreate(
-                        //     [
-                        //         'sender' => $sender,
-                        //         'channel_id' => $channelId,
-                        //         'chat_id' => $messageData['chat_id'] ?? null,
-                        //         'last_message_at' => now(),
-                        //     ],
-                        //     [
-                        //         'status' => 'active',
-                        //         'processing' => false,
-                        //     ]
-                        // );
                         $conversation = Conversation::firstOrCreate(
                             [
                                 'sender' => $messageData['from'],
@@ -68,8 +50,6 @@ class GetMessageWebhookService
                                 'processing' => false,
                             ]
                         );
-
-
                         Message::updateOrCreate(
                             [
                                 'message_id' => $messageId,
@@ -87,22 +67,14 @@ class GetMessageWebhookService
                                 'payload' => $messageData,
                             ]
                         );
-
-                        // $conversation->update([
-                        //     'last_message_at' => now(),
-                        //     'chat_id' => $messageData['chat_id'] ?? null,
-                        // ]);
                         $conversation->update([
                             'chat_id' => $messageData['chat_id'] ?? $conversation->chat_id,
                             'last_message_at' => now(),
                         ]);
-
                         $conversationIds[$conversation->id] = true;
-
                         $storedMessages++;
                     }
                 });
-
                 foreach (array_keys($conversationIds) as $conversationId) {
                     ProcessConversation::dispatch(
                         $conversationId,
@@ -110,30 +82,23 @@ class GetMessageWebhookService
                         1
                     )->delay(now()->addSeconds(3));
                 }
-
                 return [
                     'status' => true,
                     'messages_stored' => $storedMessages,
                 ];
-
             } catch (InvalidArgumentException $e) {
-
                 Log::warning('Invalid webhook payload.', [
                     'message' => $e->getMessage(),
                     'payload' => $request->all(),
                 ]);
-
                 throw $e;
-
             } catch (\Throwable $e) {
-
                 Log::error('Webhook processing failed.', [
                     'message' => $e->getMessage(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
                     'payload' => $request->all(),
                 ]);
-
                 throw $e;
             }
         }

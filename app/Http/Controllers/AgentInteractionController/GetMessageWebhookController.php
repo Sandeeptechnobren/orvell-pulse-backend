@@ -9,7 +9,6 @@ class GetMessageWebhookController extends Controller{
       public function __construct(
         protected GetMessageWebhookService $webhookService
     ) {}
-
     public function receive(Request $request)
     {
         $result = $this->webhookService->receive($request);
