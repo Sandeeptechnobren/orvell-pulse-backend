@@ -16,7 +16,7 @@ class StoreBaleRequest extends FormRequest
         return [
             'container_id' => ['required', 'integer', 'exists:tbl_containers,id'],
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.category_id' => ['required', 'integer', 'exists:tbl_categories,id'],
+            'lines.*.category_id' => ['required', 'integer', 'exists:item_category,id'],
             'lines.*.quantity' => ['required', 'integer', 'min:1', 'max:1000'],
         ];
     }

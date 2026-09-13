@@ -35,7 +35,7 @@ class Bale extends Model
 
     public function category(): BelongsTo
     {
-        return $this->belongsTo(Category::class, 'category_id');
+        return $this->belongsTo(Item_category::class, 'category_id');
     }
 
     public function stockMovements(): HasMany

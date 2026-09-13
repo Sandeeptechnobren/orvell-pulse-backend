@@ -50,7 +50,7 @@ class CustomerManagementRequest extends FormRequest
             'zipcode' => ['nullable', 'string', 'max:20'],
             'preferred_categories' => ['nullable', 'array'],
             'preferred_categories.*' => ['integer', 'exists:item_category,id'],
-            'onboarding_status' => ['nullable', 'integer', 'between:0,2'],
+            'onboarding_status' => ['nullable', 'integer', 'between:0,1'],
             'meta' => ['nullable', 'array'],
         ];
     }

@@ -21,6 +21,7 @@ class Invoice extends Model
         'amendment_version',
         'order_id',
         'buyer_id',
+        'customer_id',
         'company_id',
         'client_id',
         'subtotal',
@@ -81,6 +82,11 @@ class Invoice extends Model
     public function buyer(): BelongsTo
     {
         return $this->belongsTo(Buyer::class, 'buyer_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function company(): BelongsTo

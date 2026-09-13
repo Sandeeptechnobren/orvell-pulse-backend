@@ -3,11 +3,9 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Models\Buyer;
-use App\Models\Bale;
-use App\Models\Invoice;
+use App\Models\Customer;
+use App\Models\BaleBatch;
 use App\Models\Item_category;
-use App\Models\StockManagement;
 use App\Services\InventoryService;
 use App\Services\InvoiceService;
 use App\Services\AuditService;
@@ -17,177 +15,128 @@ use Illuminate\Validation\ValidationException;
 
 class SaleService
 {
-    protected InventoryService $inventoryService;
-    protected InvoiceService $invoiceService;
-    protected AuditService $auditService;
-
     public function __construct(
-        InventoryService $inventoryService,
-        InvoiceService $invoiceService,
-        AuditService $auditService
+        protected InventoryService $inventoryService,
+        protected InvoiceService $invoiceService,
+        protected AuditService $auditService
     ) {
-        $this->inventoryService = $inventoryService;
-        $this->invoiceService = $invoiceService;
-        $this->auditService = $auditService;
     }
 
     /**
-     * Coordinate complete Sale workflow: Buyer validation -> Bale reservation -> Order -> Line Items -> Invoice -> Finalization -> Pickup Code.
-     * Guaranteed transaction-safe; fails safely with full rollback if any check fails.
+     * Complete sale workflow: customer resolution -> quantity allocation from
+     * batches (FIFO by arrival date, oldest containers first) -> order ->
+     * finalized invoice with per-batch line snapshots -> pickup code.
      *
-     * @param array $data
-     * @param int|null $companyId
-     * @return array
-     * @throws ValidationException
+     * Expected $data:
+     *  - customer_id OR customer_uuid OR customer_whatsapp
+     *  - items: [ { item_category_id, quantity, unit_price, item_description? } ]
+     *  - optional: tax_amount, discount_amount, payment_method, notes, currency
      */
     public function createSale(array $data, ?int $companyId = null): array
     {
         return DB::transaction(function () use ($data, $companyId) {
-            $targetCompanyId = $companyId ?? ($data['company_id'] ?? auth()->user()?->company_id);
+            // 1. Resolve the customer (single identity shared with WhatsApp chat)
+            $customer = null;
+            if (!empty($data['customer_id'])) {
+                $customer = Customer::find($data['customer_id']);
+            } elseif (!empty($data['customer_uuid'])) {
+                $customer = Customer::where('uuid', $data['customer_uuid'])->first();
+            } elseif (!empty($data['customer_whatsapp'])) {
+                $customer = Customer::where('whatsapp_number', $data['customer_whatsapp'])->first();
+            }
 
-            if (!$targetCompanyId) {
+            if (!$customer) {
                 throw ValidationException::withMessages([
-                    'company_id' => ['Company ID is required to process a sale.'],
+                    'customer' => ['A registered customer is required. Register the buyer first.'],
                 ]);
             }
 
-            // 1. Validate / Resolve Buyer (Authoritative PULSE identity)
-            $buyer = null;
-            if (!empty($data['buyer_id'])) {
-                $buyer = Buyer::where('id', $data['buyer_id'])->first();
-                if (!$buyer || ($buyer->company_id && $buyer->company_id != $targetCompanyId)) {
-                    throw ValidationException::withMessages([
-                        'buyer_id' => ['Buyer not found or unauthorized for this company.'],
-                    ]);
-                }
-            } elseif (!empty($data['buyer_phone'])) {
-                $buyer = Buyer::firstOrCreate(
-                    [
-                        'whatsapp_number' => $data['buyer_phone'],
-                        'company_id'      => $targetCompanyId,
-                    ],
-                    [
-                        'name'           => $data['buyer_name'] ?? 'PULSE Wholesale Buyer',
-                        'category'       => 'REGULAR',
-                        'priority_level' => 'STANDARD',
-                    ]
-                );
-            }
-
-            if (!$buyer) {
+            // 2. Allocate quantities from batches
+            $items = $data['items'] ?? [];
+            if (empty($items)) {
                 throw ValidationException::withMessages([
-                    'buyer' => ['Valid Buyer identification is required.'],
+                    'items' => ['Sale must include at least one line.'],
                 ]);
             }
 
-            // 2. Resolve and Lock Physical Bales
-            $requestedBaleIds = [];
+            $allocationPlan = [];
             $lineItemsData = [];
             $totalQuantity = 0;
             $calculatedTotal = 0.00;
 
-            $items = $data['items'] ?? [];
-            if (empty($items)) {
-                throw ValidationException::withMessages([
-                    'items' => ['Sale must include at least one item or garment category.'],
-                ]);
-            }
-
             foreach ($items as $item) {
-                if (!empty($item['bale_ids'])) {
-                    // Direct Bale selection
-                    $baleIds = (array) $item['bale_ids'];
-                    $bales = Bale::whereIn('id', $baleIds)
-                        ->where('company_id', $targetCompanyId)
-                        ->lockForUpdate()
-                        ->get();
-
-                    if ($bales->count() !== count($baleIds)) {
-                        throw ValidationException::withMessages([
-                            'items' => ['One or more requested bales are unavailable or belong to another company.'],
-                        ]);
-                    }
-
-                    foreach ($bales as $b) {
-                        if ($b->status !== 'available') {
-                            throw ValidationException::withMessages([
-                                'items' => ["Bale {$b->bale_code} is currently '{$b->status}' and cannot be reserved."],
-                            ]);
-                        }
-                        $requestedBaleIds[] = $b->id;
-                        $unitPrice = round((float) ($item['unit_price'] ?? $b->selling_price), 2);
-                        $lineItemsData[] = [
-                            'bale_id'          => $b->id,
-                            'container_id'     => $b->container_id,
-                            'item_category_id' => $b->item_category_id,
-                            'item_description' => $item['item_description'] ?? ($b->category?->category_name ?? 'Garment Bale'),
-                            'quantity'         => 1,
-                            'unit_price'       => $unitPrice,
-                            'total_price'      => $unitPrice,
-                        ];
-                        $calculatedTotal = round($calculatedTotal + $unitPrice, 2);
-                        $totalQuantity++;
-                    }
-                } elseif (!empty($item['item_category_id']) && !empty($item['quantity'])) {
-                    // Category-based automatic bale allocation
-                    $categoryId = (int) $item['item_category_id'];
-                    $qty = (int) $item['quantity'];
-
-                    $availableBales = Bale::where('item_category_id', $categoryId)
-                        ->where('company_id', $targetCompanyId)
-                        ->where('status', 'available')
-                        ->lockForUpdate()
-                        ->limit($qty)
-                        ->get();
-
-                    if ($availableBales->count() < $qty) {
-                        $catName = Item_category::find($categoryId)?->category_name ?? "Category #{$categoryId}";
-                        throw ValidationException::withMessages([
-                            'items' => ["Insufficient stock for {$catName}. Requested: {$qty}, Available: {$availableBales->count()}."],
-                        ]);
-                    }
-
-                    $unitPrice = round((float) ($item['unit_price'] ?? ($availableBales->first()->selling_price ?: 0.00)), 2);
-
-                    foreach ($availableBales as $b) {
-                        $requestedBaleIds[] = $b->id;
-                        $lineItemsData[] = [
-                            'bale_id'          => $b->id,
-                            'container_id'     => $b->container_id,
-                            'item_category_id' => $b->item_category_id,
-                            'item_description' => $item['item_description'] ?? ($b->category?->category_name ?? 'Garment Bale'),
-                            'quantity'         => 1,
-                            'unit_price'       => $unitPrice,
-                            'total_price'      => $unitPrice,
-                        ];
-                        $calculatedTotal = round($calculatedTotal + $unitPrice, 2);
-                        $totalQuantity++;
-                    }
+                if (empty($item['item_category_id']) || empty($item['quantity'])) {
+                    throw ValidationException::withMessages([
+                        'items' => ['Each line needs item_category_id and quantity.'],
+                    ]);
                 }
-            }
 
-            if (empty($requestedBaleIds)) {
-                throw ValidationException::withMessages([
-                    'items' => ['No physical bales could be allocated for this sale.'],
-                ]);
+                $unitPrice = round((float) ($item['unit_price'] ?? 0), 2);
+                if ($unitPrice <= 0) {
+                    throw ValidationException::withMessages([
+                        'items' => ['Each sale line requires a unit_price greater than zero.'],
+                    ]);
+                }
+
+                $categoryId = (int) $item['item_category_id'];
+                $requested = (int) $item['quantity'];
+
+                // FIFO: oldest arrivals first, spanning containers if needed.
+                $batches = BaleBatch::where('category_id', $categoryId)
+                    ->where('qty_available', '>', 0)
+                    ->orderBy('arrival_date')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                $availableTotal = $batches->sum('qty_available');
+                if ($availableTotal < $requested) {
+                    $catName = Item_category::find($categoryId)?->category_name ?? "Category #{$categoryId}";
+                    throw ValidationException::withMessages([
+                        'items' => ["Insufficient stock for {$catName}. Requested: {$requested}, Available: {$availableTotal}."],
+                    ]);
+                }
+
+                $remaining = $requested;
+                foreach ($batches as $batch) {
+                    if ($remaining <= 0) {
+                        break;
+                    }
+
+                    $take = min($remaining, $batch->qty_available);
+                    $remaining -= $take;
+
+                    $allocationPlan[] = ['batch' => $batch, 'quantity' => $take];
+
+                    $lineTotal = round($take * $unitPrice, 2);
+                    $lineItemsData[] = [
+                        'bale_batch_id'    => $batch->id,
+                        'container_id'     => $batch->container_id,
+                        'item_category_id' => $categoryId,
+                        'item_description' => $item['item_description']
+                            ?? ($batch->category?->category_name ?? 'Garment Bale'),
+                        'quantity'         => $take,
+                        'unit_price'       => $unitPrice,
+                        'total_price'      => $lineTotal,
+                    ];
+                    $calculatedTotal = round($calculatedTotal + $lineTotal, 2);
+                    $totalQuantity += $take;
+                }
             }
 
             $authUser = auth()->user();
             $isStaffUser = $authUser instanceof \App\Models\User;
-            $salespersonId = $isStaffUser ? $authUser->id : null;
-            $clientId = $authUser instanceof \App\Models\Client ? $authUser->id : ($buyer->client_id ?? null);
             $createdById = $isStaffUser ? $authUser->id : null;
 
-            // 3. Generate unique pickup code #PKP-XXXX
-            $pickupCode = 'PKP-' . strtoupper(Str::random(6));
+            // 3. Unique pickup code
+            $pickupCode = $this->generatePickupCode();
 
-            // 4. Create Order record
+            // 4. Order record
             $order = Order::create([
-                'buyer_id'          => $buyer->id,
-                'customer_name'     => $buyer->name,
-                'company_id'        => $targetCompanyId,
-                'client_id'         => $clientId,
-                'salesperson_id'    => $salespersonId,
+                'customer_id'       => $customer->id,
+                'customer_name'     => $customer->name,
+                'company_id'        => $companyId,
+                'salesperson_id'    => $createdById,
                 'order_quantity'    => $totalQuantity,
                 'total_amount'      => $calculatedTotal,
                 'order_amount'      => $calculatedTotal,
@@ -202,67 +151,167 @@ class SaleService
                 'created_by'        => $createdById,
             ]);
 
-            // 5. Atomically reserve physical Bales
-            $reservedBales = $this->inventoryService->reserveBales(
-                $requestedBaleIds,
+            // 5. Move quantities available -> sold + stock movements
+            $this->inventoryService->consumeFromBatches(
+                $allocationPlan,
                 $order->id,
-                $createdById,
-                $targetCompanyId
+                $createdById
             );
 
-            // 6. Generate and finalize Invoice with line item snapshots
+            // 6. Finalized invoice with per-batch line snapshots
             $invoice = $this->invoiceService->createInvoice([
                 'order_id'        => $order->id,
-                'buyer_id'        => $buyer->id,
-                'company_id'      => $targetCompanyId,
-                'client_id'       => $order->client_id,
+                'customer_id'     => $customer->id,
+                'company_id'      => $companyId,
                 'tax_amount'      => $data['tax_amount'] ?? 0.00,
                 'discount_amount' => $data['discount_amount'] ?? 0.00,
                 'items'           => $lineItemsData,
-                'status'          => 'finalized', // Immediately finalized upon sale confirmation
+                'status'          => 'finalized',
                 'notes'           => $order->notes,
-            ], $targetCompanyId);
+            ], $companyId);
 
-            // Link invoice_code back to Order
             $order->update([
                 'invoice_code' => $invoice->invoice_number,
             ]);
 
-            // 7. Audit log
+            // 7. Audit trail
             $this->auditService->log(
                 action: 'sale.create',
                 auditable: $order,
                 newValues: [
                     'order_no'       => $order->order_no,
                     'invoice_number' => $invoice->invoice_number,
+                    'buyer_id'       => $customer->buyer_id,
                     'pickup_code'    => $order->pickup_code,
                     'total_amount'   => $order->total_amount,
-                    'bale_count'     => count($reservedBales),
+                    'total_quantity' => $totalQuantity,
                 ],
-                companyId: $targetCompanyId,
-                userId: auth()->id()
+                companyId: $companyId,
+                userId: $createdById
             );
 
             return [
-                'order'          => $order->load(['buyer', 'invoice.items']),
-                'invoice'        => $invoice,
-                'reserved_bales' => $reservedBales,
-                'pickup_code'    => $order->pickup_code,
+                'order'       => $order->load(['customer', 'invoice.items']),
+                'invoice'     => $invoice,
+                'pickup_code' => $order->pickup_code,
             ];
         });
     }
 
     /**
-     * Find order by unique pickup code.
+     * Release goods against a pickup code: "Confirm #PKP-XXXXXX released".
+     * Requires the invoice to be paid; moves quantities sold -> released and
+     * logs the releasing staff identity. Pickup codes never expire.
      */
-    public function getSaleByPickupCode(string $pickupCode, ?int $companyId = null): ?Order
+    public function confirmPickup(string $pickupCode, ?int $staffId = null): Order
     {
-        $query = Order::where('pickup_code', $pickupCode)->with(['buyer', 'invoice.items', 'reservedBales', 'company']);
+        $order = DB::transaction(function () use ($pickupCode, $staffId) {
+            $order = Order::where('pickup_code', $pickupCode)
+                ->lockForUpdate()
+                ->first();
 
-        if ($companyId) {
-            $query->where('company_id', $companyId);
+            if (!$order) {
+                throw ValidationException::withMessages([
+                    'pickup' => ["No order found for pickup code {$pickupCode}."],
+                ]);
+            }
+
+            if ($order->pickup_status === 'released') {
+                throw ValidationException::withMessages([
+                    'pickup' => ["Order {$order->order_no} was already released."],
+                ]);
+            }
+
+            if ($order->payment_status !== 'paid') {
+                throw ValidationException::withMessages([
+                    'pickup' => ["Payment for order {$order->order_no} is '{$order->payment_status}'. Goods are released only after the cashier confirms payment."],
+                ]);
+            }
+
+            $lines = $order->invoice?->items
+                ?->filter(fn ($item) => $item->bale_batch_id)
+                ->map(fn ($item) => [
+                    'bale_batch_id' => $item->bale_batch_id,
+                    'quantity'      => $item->quantity,
+                ])
+                ->values()
+                ->all() ?? [];
+
+            if (empty($lines)) {
+                throw ValidationException::withMessages([
+                    'pickup' => ["Order {$order->order_no} has no stock lines linked to its invoice."],
+                ]);
+            }
+
+            $this->inventoryService->releaseFromBatches($lines, $order->id, $staffId ?? auth()->id());
+
+            $order->update([
+                'pickup_status' => 'released',
+                'status'        => 'completed',
+            ]);
+
+            $this->auditService->log(
+                action: 'sale.release',
+                auditable: $order,
+                newValues: [
+                    'pickup_code' => $pickupCode,
+                    'released_by' => $staffId ?? auth()->id(),
+                    'quantity'    => array_sum(array_column($lines, 'quantity')),
+                ],
+                companyId: $order->company_id,
+                userId: $staffId ?? auth()->id()
+            );
+
+            return $order->fresh(['customer', 'invoice.items']);
+        });
+
+        $this->notifyReleased($order);
+
+        return $order;
+    }
+
+    /**
+     * Final WhatsApp confirmation once goods leave the warehouse - queued so
+     * the release API never waits on the gateway.
+     */
+    private function notifyReleased(Order $order): void
+    {
+        $customer = $order->customer;
+        $chatId = $customer?->wa_id ?? $customer?->whatsapp_number;
+
+        if (!$chatId) {
+            return;
         }
 
-        return $query->first();
+        $quantity = (int) $order->order_quantity;
+
+        \App\Jobs\SendWhatsAppText::dispatch(
+            $chatId,
+            "Your goods have been released ✅\n\n"
+            . "Order: {$order->order_no}\n"
+            . "Invoice: {$order->invoice_code}\n"
+            . "Items: {$quantity} bale" . ($quantity === 1 ? '' : 's') . "\n\n"
+            . "Thank you for shopping with Orvell 🙏 We look forward to serving you again.",
+            "release:{$order->order_no}"
+        );
+    }
+
+    /**
+     * Find order by unique pickup code.
+     */
+    public function getSaleByPickupCode(string $pickupCode): ?Order
+    {
+        return Order::where('pickup_code', $pickupCode)
+            ->with(['customer', 'invoice.items'])
+            ->first();
+    }
+
+    private function generatePickupCode(): string
+    {
+        do {
+            $code = 'PKP-' . strtoupper(Str::random(6));
+        } while (Order::where('pickup_code', $code)->exists());
+
+        return $code;
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateBaleRequest extends FormRequest
 {
@@ -15,11 +14,10 @@ class UpdateBaleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category_id' => ['sometimes', 'integer', 'exists:tbl_categories,id'],
-            'status' => [
-                'sometimes',
-                Rule::in(['in_stock', 'sold', 'released', 'damaged']),
-            ],
+            'mark_damaged' => ['nullable', 'integer', 'min:1'],
+            'restore_damaged' => ['nullable', 'integer', 'min:1'],
+            'correct' => ['nullable', 'integer'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

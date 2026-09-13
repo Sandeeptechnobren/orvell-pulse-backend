@@ -21,9 +21,19 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'buyer_id'    => 'nullable|exists:buyers,id',
-            'buyer_phone' => 'nullable|string',
-            'items'       => 'required|array|min:1',
+            'customer_id'              => 'nullable|integer|exists:customers,id',
+            'customer_uuid'            => 'nullable|string|exists:customers,uuid',
+            'customer_whatsapp'        => 'nullable|string',
+            'items'                    => 'required|array|min:1',
+            'items.*.unit_price'       => 'required|numeric|min:0.01',
+            'items.*.bale_ids'         => 'nullable|array',
+            'items.*.bale_ids.*'       => 'integer',
+            'items.*.item_category_id' => 'nullable|integer|exists:item_category,id',
+            'items.*.quantity'         => 'nullable|integer|min:1',
+            'tax_amount'               => 'nullable|numeric|min:0',
+            'discount_amount'          => 'nullable|numeric|min:0',
+            'payment_method'           => 'nullable|string|max:30',
+            'notes'                    => 'nullable|string|max:2000',
         ]);
 
         $companyId = auth()->user()?->company_id ?? $request->input('company_id');
@@ -31,7 +41,7 @@ class OrderController extends Controller
 
         return response()->json([
             'success'     => true,
-            'message'     => 'Order created successfully',
+            'message'     => 'Sale recorded. Invoice ' . $sale['invoice']->invoice_number . ' generated.',
             'order'       => new OrderResource($sale['order']),
             'invoice'     => $sale['invoice'],
             'pickup_code' => $sale['pickup_code'],
@@ -70,4 +80,5 @@ class OrderController extends Controller
             'data' => new OrderResource($order),
         ]);
     }
+
 }

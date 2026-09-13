@@ -8,9 +8,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class CustomerManagementResource extends JsonResource
 {
     private const ONBOARDING_LABELS = [
-        0 => 'pending',
-        1 => 'in_progress',
-        2 => 'completed',
+        0 => 'incomplete',
+        1 => 'completed',
     ];
 
     public function toArray(Request $request): array

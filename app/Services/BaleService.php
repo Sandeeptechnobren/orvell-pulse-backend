@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Bale;
+use App\Models\BaleBatch;
 use App\Models\Container;
+use App\Models\StockMovement;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,9 +12,14 @@ use RuntimeException;
 
 class BaleService
 {
+    public function __construct(
+        private readonly StockNotificationService $stockNotifications
+    ) {
+    }
+
     public function list(array $filters = []): LengthAwarePaginator
     {
-        $query = Bale::query()->with(['container', 'supplier', 'category']);
+        $query = BaleBatch::query()->with(['container', 'supplier', 'category']);
 
         if (!empty($filters['container_id'])) {
             $query->where('container_id', $filters['container_id']);
@@ -23,135 +29,180 @@ class BaleService
             $query->where('category_id', $filters['category_id']);
         }
 
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (!empty($filters['search'])) {
-            $query->where('bale_id', 'like', '%' . $filters['search'] . '%');
+        if (($filters['status'] ?? '') === 'available') {
+            $query->where('qty_available', '>', 0);
+        } elseif (($filters['status'] ?? '') === 'sold_out') {
+            $query->where('qty_available', 0);
         }
 
         return $query
-            ->orderByDesc('created_at')
-            ->orderBy('bale_id')
+            ->orderByDesc('arrival_date')
+            ->orderBy('id')
             ->paginate($filters['per_page'] ?? 15);
     }
 
+    /**
+     * Register incoming stock: each line adds quantity to the batch for that
+     * container + category (created on first arrival).
+     */
     public function bulkCreate(int $containerId, array $lines): Collection
     {
-        return DB::transaction(function () use ($containerId, $lines) {
+        $batches = DB::transaction(function () use ($containerId, $lines) {
             $container = Container::lockForUpdate()->findOrFail($containerId);
 
             if ($container->status === 'closed') {
                 throw new RuntimeException(
-                    'This container is closed. Bales cannot be added to a closed container.'
+                    'This container is closed. Stock cannot be added to a closed container.'
                 );
             }
 
-            $sequence = $this->nextSequence($container->id);
-            $created = collect();
+            $touched = collect();
 
             foreach ($lines as $line) {
-                for ($i = 0; $i < $line['quantity']; $i++) {
-                    $created->push(Bale::create([
-                        'bale_id' => $this->makeBaleId($container->container_id, $sequence++),
+                $qty = (int) $line['quantity'];
+
+                $batch = BaleBatch::lockForUpdate()->firstOrCreate(
+                    [
                         'container_id' => $container->id,
-                        'supplier_id' => $container->supplier_id,
-                        'category_id' => $line['category_id'],
+                        'category_id'  => (int) $line['category_id'],
+                    ],
+                    [
+                        'supplier_id'  => $container->supplier_id,
                         'arrival_date' => $container->arrival_date,
-                        'status' => 'in_stock',
-                    ]));
-                }
+                    ]
+                );
+
+                $batch->increment('qty_total', $qty);
+                $batch->increment('qty_available', $qty);
+
+                StockMovement::create([
+                    'bale_batch_id'  => $batch->id,
+                    'container_id'   => $container->id,
+                    'movement_type'  => 'arrival',
+                    'reference_type' => 'container',
+                    'reference_id'   => $container->id,
+                    'quantity'       => $qty,
+                    'movement_date'  => now(),
+                    'created_by'     => auth()->id(),
+                ]);
+
+                $touched->push($batch->id);
             }
 
-            return $created->load('category');
+            return BaleBatch::with(['container', 'supplier', 'category'])
+                ->whereIn('id', $touched->unique())
+                ->get();
+        });
+
+        // Announce the arrival to customers (queued per recipient, after commit).
+        $this->stockNotifications->broadcastArrival($lines);
+
+        return $batches;
+    }
+
+    public function find(int $batchId): BaleBatch
+    {
+        return BaleBatch::with(['container', 'supplier', 'category', 'stockMovements'])
+            ->findOrFail($batchId);
+    }
+
+    /**
+     * Quantity adjustments on a batch:
+     *  - mark_damaged: move N from available to damaged
+     *  - restore_damaged: move N from damaged back to available
+     *  - correct: add or remove N available (count correction; negative allowed)
+     */
+    public function adjust(int $batchId, array $data): BaleBatch
+    {
+        return DB::transaction(function () use ($batchId, $data) {
+            $batch = BaleBatch::lockForUpdate()->findOrFail($batchId);
+
+            if (!empty($data['mark_damaged'])) {
+                $qty = (int) $data['mark_damaged'];
+                if ($qty > $batch->qty_available) {
+                    throw new RuntimeException(
+                        "Only {$batch->qty_available} available; cannot mark {$qty} as damaged."
+                    );
+                }
+                $batch->decrement('qty_available', $qty);
+                $batch->increment('qty_damaged', $qty);
+                $this->logAdjustment($batch, 'damaged', $qty, $data['notes'] ?? null);
+            }
+
+            if (!empty($data['restore_damaged'])) {
+                $qty = (int) $data['restore_damaged'];
+                if ($qty > $batch->qty_damaged) {
+                    throw new RuntimeException(
+                        "Only {$batch->qty_damaged} damaged; cannot restore {$qty}."
+                    );
+                }
+                $batch->decrement('qty_damaged', $qty);
+                $batch->increment('qty_available', $qty);
+                $this->logAdjustment($batch, 'damage_restored', $qty, $data['notes'] ?? null);
+            }
+
+            if (isset($data['correct']) && (int) $data['correct'] !== 0) {
+                $qty = (int) $data['correct'];
+                if ($qty < 0 && abs($qty) > $batch->qty_available) {
+                    throw new RuntimeException(
+                        "Only {$batch->qty_available} available; cannot remove " . abs($qty) . '.'
+                    );
+                }
+                $batch->increment('qty_available', $qty);
+                $batch->increment('qty_total', $qty);
+                $this->logAdjustment($batch, 'correction', $qty, $data['notes'] ?? null);
+            }
+
+            return $batch->fresh(['container', 'supplier', 'category']);
         });
     }
 
-    public function find(Bale $bale): Bale
+    public function delete(int $batchId): void
     {
-        return $bale->load(['container', 'supplier', 'category', 'stockMovements']);
-    }
+        DB::transaction(function () use ($batchId) {
+            $batch = BaleBatch::lockForUpdate()->findOrFail($batchId);
 
-    public function update(Bale $bale, array $data): Bale
-    {
-        if (isset($data['status'])) {
-            $this->assertValidTransition($bale->status, $data['status']);
-        }
+            if ($batch->qty_sold > 0 || $batch->qty_released > 0) {
+                throw new RuntimeException(
+                    'This batch has sales or releases recorded and cannot be deleted. Use a correction instead.'
+                );
+            }
 
-        $bale->update($data);
-
-        return $bale->fresh(['container', 'supplier', 'category']);
-    }
-
-    public function delete(Bale $bale): void
-    {
-        if ($bale->status !== 'in_stock') {
-            throw new RuntimeException(
-                "Bale {$bale->bale_id} is {$bale->status} and cannot be deleted. Only in-stock bales can be removed."
-            );
-        }
-
-        if ($bale->stockMovements()->exists()) {
-            throw new RuntimeException(
-                "Bale {$bale->bale_id} has stock movements and cannot be deleted. Mark it as damaged instead."
-            );
-        }
-
-        $bale->delete();
+            $batch->stockMovements()->delete();
+            $batch->delete();
+        });
     }
 
     public function stockSummary(): Collection
     {
-        return Bale::query()
-            ->join('tbl_containers', 'tbl_containers.id', '=', 'tbl_bales.container_id')
-            ->join('tbl_categories', 'tbl_categories.id', '=', 'tbl_bales.category_id')
-            ->selectRaw("
+        return BaleBatch::query()
+            ->join('tbl_containers', 'tbl_containers.id', '=', 'tbl_bale_batches.container_id')
+            ->join('item_category', 'item_category.id', '=', 'tbl_bale_batches.category_id')
+            ->selectRaw('
                 tbl_containers.container_id,
-                tbl_containers.arrival_date,
-                tbl_categories.category_name,
-                COUNT(*) as total_bales,
-                SUM(CASE WHEN tbl_bales.status = 'in_stock' THEN 1 ELSE 0 END) as in_stock,
-                SUM(CASE WHEN tbl_bales.status = 'sold' THEN 1 ELSE 0 END) as sold,
-                SUM(CASE WHEN tbl_bales.status = 'released' THEN 1 ELSE 0 END) as released,
-                SUM(CASE WHEN tbl_bales.status = 'damaged' THEN 1 ELSE 0 END) as damaged
-            ")
-            ->groupBy('tbl_containers.container_id', 'tbl_containers.arrival_date', 'tbl_categories.category_name')
-            ->orderByDesc('tbl_containers.arrival_date')
+                tbl_bale_batches.arrival_date,
+                item_category.category_name,
+                tbl_bale_batches.qty_total as total_bales,
+                tbl_bale_batches.qty_available as available,
+                tbl_bale_batches.qty_sold as sold,
+                tbl_bale_batches.qty_released as released,
+                tbl_bale_batches.qty_damaged as damaged
+            ')
+            ->orderByDesc('tbl_bale_batches.arrival_date')
             ->get();
     }
 
-    private function nextSequence(int $containerId): int
+    private function logAdjustment(BaleBatch $batch, string $type, int $qty, ?string $notes): void
     {
-        $last = Bale::where('container_id', $containerId)
-            ->orderByDesc('id')
-            ->value('bale_id');
-
-        if (!$last) {
-            return 1;
-        }
-
-        return (int) substr($last, strrpos($last, '-B') + 2) + 1;
-    }
-
-    private function makeBaleId(string $containerCode, int $sequence): string
-    {
-        return $containerCode . '-B' . str_pad($sequence, 4, '0', STR_PAD_LEFT);
-    }
-
-    private function assertValidTransition(string $from, string $to): void
-    {
-        $allowed = [
-            'in_stock' => ['sold', 'damaged'],
-            'sold' => ['released', 'in_stock'],
-            'released' => [],
-            'damaged' => ['in_stock'],
-        ];
-
-        if ($from !== $to && !in_array($to, $allowed[$from] ?? [], true)) {
-            throw new RuntimeException(
-                "Cannot change a bale from '{$from}' to '{$to}'."
-            );
-        }
+        StockMovement::create([
+            'bale_batch_id'  => $batch->id,
+            'container_id'   => $batch->container_id,
+            'movement_type'  => $type,
+            'reference_type' => 'adjustment',
+            'quantity'       => $qty,
+            'movement_date'  => now(),
+            'created_by'     => auth()->id(),
+            'notes'          => $notes,
+        ]);
     }
 }

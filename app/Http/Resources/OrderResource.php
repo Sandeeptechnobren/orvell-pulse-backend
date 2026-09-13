@@ -10,6 +10,12 @@ class OrderResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'uuid' => $this->uuid,
+            'order_no' => $this->order_no,
+            'invoice_number' => $this->invoice_code,
+            'pickup_code' => $this->pickup_code,
+            'pickup_status' => $this->pickup_status,
+            'order_quantity' => $this->order_quantity,
             'space_name' => $this->space?->name,
             'customer_name' => $this->customer?->name,
             'customer_number' => $this->customer?->whatsapp_number,

@@ -133,6 +133,16 @@ class GetMessageWebhookService
                         if (!empty($messageData['from_me'])) {
                             continue;
                         }
+                        // WhatsApp protocol/system events (encryption notices,
+                        // sync placeholders) carry no customer content - the
+                        // gateway sends them as source "system" / type
+                        // "unknown". Storing them makes the agent reply to
+                        // messages the customer never sent.
+                        if (($messageData['source'] ?? null) === 'system'
+                            || ($messageData['type'] ?? null) === 'unknown'
+                        ) {
+                            continue;
+                        }
                         $sender = $messageData['from'] ?? null;
                         if (!$sender) {
                             continue;

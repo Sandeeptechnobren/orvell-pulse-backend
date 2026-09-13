@@ -2,6 +2,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderRequestController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\Item_categoryController;
@@ -37,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('logoutall', [AuthController::class, 'logoutall']);
   Route::apiResource('containers', ContainerController::class);
   Route::get('bales/summary', [BaleController::class, 'summary']);
+  Route::post('bales/{bale}/notify', [BaleController::class, 'notify']);
   Route::apiResource('bales', BaleController::class);
   Route::prefix('whatsapp')->group(function () {
     Route::get('/messages', [\App\Http\Controllers\API\WhatsAppLedgerController::class, 'index']);
@@ -65,10 +67,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/{uuid}', [CustomerManagementController::class, 'destroy']);
   });
   Route::prefix('orders')->group(function () {
-    Route::get('/list', [OrderController::class, 'index']); 
+    Route::get('/list', [OrderController::class, 'index']);
     Route::post('/create', [OrderController::class, 'store']);
-    Route::get('show/{uuid}', [OrderController::class, 'show']);   
-  }); 
+    Route::get('show/{uuid}', [OrderController::class, 'show']);
+  });
+  Route::get('/dashboard/summary', [\App\Http\Controllers\PulseDashboardController::class, 'summary']);
+  Route::prefix('order-requests')->group(function () {
+    Route::get('/list', [OrderRequestController::class, 'index']);
+    Route::get('/show/{uuid}', [OrderRequestController::class, 'show']);
+    Route::post('/convert/{uuid}', [OrderRequestController::class, 'convert']);
+    Route::post('/decline/{uuid}', [OrderRequestController::class, 'decline']);
+  });
   Route::prefix('payment')->group(function(){
     Route::post('/create', [PaymentController::class, 'payment'])->name('payment');
     Route::post('/cash', [PaymentController::class, 'recordCash'])->name('payment.cash');

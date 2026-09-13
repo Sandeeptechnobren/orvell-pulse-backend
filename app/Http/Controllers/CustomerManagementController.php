@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Request\CustomerManagementRequest;
+use App\Http\Requests\CustomerManagementRequest;
 use App\Http\Resources\CustomerManagementResource;
 use App\Services\CustomerManagementService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;

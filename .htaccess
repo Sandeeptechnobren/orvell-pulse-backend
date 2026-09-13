@@ -1,0 +1,13 @@
+# Block direct access to everything except the Laravel public/ directory.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !/projects/orvell/public/
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# Belt and braces: never serve dotfiles or sensitive file types.
+<FilesMatch "^\.|composer\.(json|lock)$|artisan$">
+    Require all denied
+</FilesMatch>

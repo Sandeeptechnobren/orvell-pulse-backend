@@ -14,6 +14,7 @@ class InvoiceItem extends Model
         'uuid',
         'invoice_id',
         'bale_id',
+        'bale_batch_id',
         'container_id',
         'product_id',
         'item_category_id',
@@ -51,6 +52,11 @@ class InvoiceItem extends Model
     public function bale(): BelongsTo
     {
         return $this->belongsTo(Bale::class, 'bale_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(BaleBatch::class, 'bale_batch_id');
     }
 
     public function container(): BelongsTo

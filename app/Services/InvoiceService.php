@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
-use App\Models\Buyer;
 use App\Models\Order;
 use App\Services\AuditService;
 use Illuminate\Support\Facades\DB;
@@ -30,23 +29,8 @@ class InvoiceService
     public function createInvoice(array $data, ?int $companyId = null): Invoice
     {
         return DB::transaction(function () use ($data, $companyId) {
+            // Single-company mode: company is optional metadata, not a gate.
             $targetCompanyId = $companyId ?? ($data['company_id'] ?? auth()->user()?->company_id);
-
-            if (!$targetCompanyId) {
-                throw ValidationException::withMessages([
-                    'company_id' => ['Company ID is required to generate an invoice.'],
-                ]);
-            }
-
-            // Validate buyer belongs to the company
-            if (!empty($data['buyer_id'])) {
-                $buyer = Buyer::where('id', $data['buyer_id'])->first();
-                if (!$buyer || ($buyer->company_id && $buyer->company_id != $targetCompanyId)) {
-                    throw ValidationException::withMessages([
-                        'buyer_id' => ['Buyer not found or belongs to another company.'],
-                    ]);
-                }
-            }
 
             // Calculate totals strictly on server side using decimal precision
             $items = $data['items'] ?? [];
@@ -74,6 +58,7 @@ class InvoiceService
 
                 $lineSnapshots[] = [
                     'bale_id'          => $item['bale_id'] ?? null,
+                    'bale_batch_id'    => $item['bale_batch_id'] ?? null,
                     'container_id'     => $item['container_id'] ?? null,
                     'product_id'       => $item['product_id'] ?? null,
                     'item_category_id' => $item['item_category_id'] ?? null,
@@ -94,6 +79,7 @@ class InvoiceService
             $invoice = Invoice::create([
                 'order_id'        => $data['order_id'] ?? null,
                 'buyer_id'        => $data['buyer_id'] ?? null,
+                'customer_id'     => $data['customer_id'] ?? null,
                 'company_id'      => $targetCompanyId,
                 'client_id'       => $data['client_id'] ?? ($authUser instanceof \App\Models\Client ? $authUser->id : null),
                 'subtotal'        => $calculatedSubtotal,
@@ -116,7 +102,7 @@ class InvoiceService
 
             $this->auditService->logCreate($invoice, 'invoice.create', $targetCompanyId);
 
-            return $invoice->load(['items', 'buyer', 'order']);
+            return $invoice->load(['items', 'customer', 'order']);
         });
     }
 
@@ -171,7 +157,7 @@ class InvoiceService
                 userId: $staffId ?? auth()->id()
             );
 
-            return $inv->load(['items', 'buyer', 'order']);
+            return $inv->load(['items', 'customer', 'order']);
         });
     }
 
@@ -222,7 +208,7 @@ class InvoiceService
      */
     public function getInvoiceByNumber(string $invoiceNumber, ?int $companyId = null): ?Invoice
     {
-        $query = Invoice::where('invoice_number', $invoiceNumber)->with(['items', 'buyer', 'order', 'company']);
+        $query = Invoice::where('invoice_number', $invoiceNumber)->with(['items', 'customer', 'order']);
 
         if ($companyId) {
             $query->where('company_id', $companyId);

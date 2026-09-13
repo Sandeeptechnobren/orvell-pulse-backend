@@ -44,10 +44,21 @@ class ConversationService
     private function formatMessages($messages): array
     {
        return $messages->map(function ($message) {
+            $text = trim((string) $message->text);
+
+            // Media, stickers, reactions etc. arrive with no text. The API
+            // rejects empty content, so substitute a readable placeholder the
+            // agent can respond to gracefully.
+            if ($text === '') {
+                $text = $message->from_me
+                    ? '[automated message]'
+                    : '[The customer sent a non-text message (photo, voice note, or sticker) that cannot be viewed here. If context is unclear, politely ask them to send it as a text message.]';
+            }
+
             return [
                 'id' => $message->id,
                 'role' => $message->from_me ? 'assistant' : 'user',
-                'content' => $message->text,
+                'content' => $text,
                 'timestamp' => $message->message_timestamp,
             ];
         })->values()->toArray();
