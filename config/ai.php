@@ -21,7 +21,10 @@ return [
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
         'model'    => env('OPENAI_MODEL', env('AI_MODEL', 'gpt-4o-mini')),
     ],
-
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-5'),
+    ],
     'gemini' => [
         'api_key'  => env('GEMINI_API_KEY', env('AI_API_KEY', '')),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),

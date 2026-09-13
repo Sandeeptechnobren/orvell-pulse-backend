@@ -10,9 +10,12 @@ use App\Http\Controllers\CustomerManagementController;
 use App\Http\Controllers\API\WhatsappMessageController;
 use App\Http\Controllers\API\WhatsAppWebhookController;
 use App\Http\Controllers\CountryController;
+use App\Http\Controllers\BaleController;
+use App\Http\Controllers\ContainerController;
 use App\Http\Controllers\AgentInteractionController\GetMessageWebhookController;
 use App\Http\Controllers\API\PickupController;
 use App\Http\Controllers\API\InvoiceAmendmentController;
+use App\Http\Controllers\SupplierManagement\SupplierController;
 use App\Http\Controllers\API\ExpenseController;
 
 Route::post('signup', [AuthController::class, 'register']);
@@ -22,33 +25,31 @@ Route::post('tokenCheck', [AuthController::class, 'tokenCheck']);
 Route::post('/password-reset', [AuthController::class, 'passwordResetFlow']);
 Route::get('Country',[CountryController::class,'countries']);
 
-//webhook
 Route::post('/webhook/receive', [GetMessageWebhookController::class, 'receive']);
 
-// One endpoint per WhatsApp instance so the URL declares the role.
 Route::post('whatsapp/customer', [WhatsAppWebhookController::class, 'customer']);
 Route::post('whatsapp/admin',    [WhatsAppWebhookController::class, 'admin']);
 
-// Paystack payment webhook (charge.success → mark order paid + WhatsApp confirmation)
 Route::post('webhooks/paystack', [\App\Http\Controllers\API\PaystackWebhookController::class, 'handle']);
 
 Route::middleware('auth:sanctum')->group(function () {
   Route::post('logout', [AuthController::class, 'logout']);
   Route::post('logoutall', [AuthController::class, 'logoutall']);
-
+  Route::apiResource('containers', ContainerController::class);
+  Route::get('bales/summary', [BaleController::class, 'summary']);
+  Route::apiResource('bales', BaleController::class);
   Route::prefix('whatsapp')->group(function () {
     Route::get('/messages', [\App\Http\Controllers\API\WhatsAppLedgerController::class, 'index']);
     Route::get('/messages/{waId}', [\App\Http\Controllers\API\WhatsAppLedgerController::class, 'conversation'])->where('waId', '.*');
   });
-   
-Route::prefix('Stocks')->group(function () { 
+  Route::prefix('Stocks')->group(function () { 
    Route::get('/list', [StockManagementController::class, 'index']);
    Route::post('/add', [StockManagementController::class, 'store']);
    Route::get('/show/{uuid}', [StockManagementController::class, 'show']);
    Route::put('/update/{uuid}', [StockManagementController::class, 'update']);
    Route::delete('/delete/{uuid}', [StockManagementController::class, 'destroy']);
    });  
-Route::prefix('item-category')->group(function () { 
+  Route::prefix('category')->group(function () { 
    Route::get('/list', [Item_categoryController::class, 'index']);
    Route::post('/add', [Item_categoryController::class, 'store']);
    Route::get('/show/{uuid}', [Item_categoryController::class, 'show']);
@@ -56,12 +57,12 @@ Route::prefix('item-category')->group(function () {
    Route::delete('/delete/{uuid}', [Item_categoryController::class, 'destroy']);
    });
  
-  Route::prefix('customer')->group(function (){
-    Route::get('/list', [CustomerManagementController::class, 'index']);
-    Route::post('/add', [CustomerManagementController::class, 'store']);
-    Route::get('/show/{uuid}', [CustomerManagementController::class, 'show']);
-    Route::put('/update/{uuid}', [CustomerManagementController::class, 'update']);
-    Route::delete('/delete/{uuid}', [CustomerManagementController::class, 'destroy']);
+  Route::prefix('customers')->group(function (){
+    Route::get('/', [CustomerManagementController::class, 'index']);
+    Route::post('/', [CustomerManagementController::class, 'store']);
+    Route::get('/{uuid}', [CustomerManagementController::class, 'show']);
+    Route::put('/{uuid}', [CustomerManagementController::class, 'update']);
+    Route::delete('/{uuid}', [CustomerManagementController::class, 'destroy']);
   });
   Route::prefix('orders')->group(function () {
     Route::get('/list', [OrderController::class, 'index']); 
@@ -105,6 +106,13 @@ Route::prefix('item-category')->group(function () {
     Route::post('/initialiseAgent',[WhatsappMessageController::class,'initialiseAgent']);
     Route::post('/storeAgentPrompt',[WhatsappMessageController::class,'storeAgentPrompt']);
     Route::get('/agentPrompt',[WhatsappMessageController::class,'getAgentPrompt']);
+  });
+  Route::prefix('supplier')->group(function () {
+      Route::get('/list', [SupplierController::class, 'index']);
+      Route::post('/add', [SupplierController::class, 'store']);
+      Route::get('/show/{uuid}', [SupplierController::class, 'show']);
+      Route::put('/update/{uuid}', [SupplierController::class, 'update']);
+      Route::delete('/delete/{uuid}', [SupplierController::class, 'destroy']);
   });
 
 });

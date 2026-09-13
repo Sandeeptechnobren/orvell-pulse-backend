@@ -16,11 +16,13 @@ use App\Services\WhatsAppService;
 class ProcessConversation implements ShouldQueue
 {
     use Queueable;
+
     public function __construct(
         public int $conversationId,
         public string $scheduledAt,
         public int $clientId
     ) {}
+
     public function handle(
         ConversationService $conversationService,
         AgentPromptService $agentPromptService,
@@ -64,10 +66,22 @@ class ProcessConversation implements ShouldQueue
             $prompt = $agentPromptService->getCustomerPrompt(
                 $this->clientId
             );
+
+            $profileName = Message::where('conversation_id', $conversation->id)
+                ->where('from_me', false)
+                ->whereNotNull('from_name')
+                ->latest('id')
+                ->value('from_name');
+
             $response = $aiAgentService->generate(
                 $prompt->prompt_description,
                 $context['history'],
-                $context['current_messages']
+                $context['current_messages'],
+                [
+                    'whatsapp_number' => $conversation->sender,
+                    'wa_id' => $conversation->chat_id ?? $conversation->sender,
+                    'profile_name' => $profileName,
+                ]
             );
             $aiMessage = Message::create([
                 'conversation_id' => $conversation->id,
