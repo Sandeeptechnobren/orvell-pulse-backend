@@ -15,7 +15,7 @@ controller lives in the `API/` subfolder.
 - `PaymentController.php` — Stripe charge + history (⚠ method `paymentHistoryy` typo).
 - `WhatsappMessageController.php` — agent init / store prompt (WHAPI).
 - `CountryController.php` — public country list (⚠ no `countries` table → 500).
-- `Controller.php` — empty base (holds global Swagger `@OA\Info`).
+- `Controller.php` — empty base class.
 - ⚠ `AuthhController.php` — dead unrouted duplicate; do NOT use. `Bale/Buyer/…Controller.php` — empty scaffolds.
 
 ## Data flow

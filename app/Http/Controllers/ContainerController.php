@@ -2,48 +2,69 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreContainerRequest;
+use App\Http\Requests\UpdateContainerRequest;
+use App\Http\Resources\ContainerResource;
 use App\Models\Container;
+use App\Services\ContainerService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use RuntimeException;
 
 class ContainerController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        //
+    public function __construct(
+        private readonly ContainerService $containerService
+    ) {
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function index(Request $request): AnonymousResourceCollection
     {
-        //
+        $containers = $this->containerService->list(
+            $request->only(['status', 'supplier_id', 'search', 'arrival_from', 'arrival_to', 'per_page'])
+        );
+
+        return ContainerResource::collection($containers);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Container $container)
+    public function store(StoreContainerRequest $request): JsonResponse
     {
-        //
+        $container = $this->containerService->create(
+            $request->validated(),
+            $request->user()->id
+        );
+
+        return (new ContainerResource($container))
+            ->additional(['message' => 'Container registered successfully.'])
+            ->response()
+            ->setStatusCode(201);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Container $container)
+    public function show(Container $container): ContainerResource
     {
-        //
+        return new ContainerResource(
+            $this->containerService->find($container)
+        );
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Container $container)
+    public function update(UpdateContainerRequest $request, Container $container): JsonResponse
     {
-        //
+        $updated = $this->containerService->update($container, $request->validated());
+
+        return (new ContainerResource($updated))
+            ->additional(['message' => 'Container updated successfully.'])
+            ->response();
+    }
+
+    public function destroy(Container $container): JsonResponse
+    {
+        try {
+            $this->containerService->delete($container);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+
+        return response()->json(['message' => 'Container deleted successfully.']);
     }
 }

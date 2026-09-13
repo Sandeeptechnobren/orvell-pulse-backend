@@ -20,6 +20,7 @@ class AuthhController extends Controller
     use ResponseTrait;
     public function register(Request $request)
     {
+         
     if ($request->filled('name') && $request->filled('password')) {
         $request->validate([
             'name'              => 'required|string|max:255',

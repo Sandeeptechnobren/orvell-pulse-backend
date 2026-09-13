@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Request\CustomerManagementRequest;
 use App\Http\Resources\CustomerManagementResource;
 use App\Services\CustomerManagementService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
+use Throwable;
 
-/**
- * @OA\Tag(
- *     name="Customer Management",
- *     description="Customer management APIs"
- * )
- */
 class CustomerManagementController extends Controller
 {
     protected $service;
@@ -21,182 +21,96 @@ class CustomerManagementController extends Controller
         $this->service = $service;
     }
 
-    /**
-     * Get Customers List
-     *
-     * @OA\Get(
-     *     path="/api/customers",
-     *     tags={"Customer Management"},
-     *     summary="Get customers list",
-     *     description="Fetch all customers",
-     *     @OA\Response(
-     *         response=200,
-     *         description="Customers fetched successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Customers fetched"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(ref="#/components/schemas/CustomerManagement")
-     *             )
-     *         )
-     *     )
-     * )
-     */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        return response()->json([
-            'message' => 'Customers fetched',
-            'data' => CustomerManagementResource::collection(
-                $this->service->list()
-            )
-        ]);
+        try {
+            $customers = $this->service->list(
+                $request->only(['search', 'onboarding_status', 'city', 'per_page'])
+            );
+
+            return response()->json([
+                'message' => 'Customers fetched',
+                'data' => CustomerManagementResource::collection($customers->items()),
+                'meta' => [
+                    'current_page' => $customers->currentPage(),
+                    'last_page' => $customers->lastPage(),
+                    'per_page' => $customers->perPage(),
+                    'total' => $customers->total(),
+                ],
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Customer list failed', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Failed to fetch customers.'], 500);
+        }
     }
 
-    /**
-     * Create Customer
-     *
-     * @OA\Post(
-     *     path="/api/customers",
-     *     tags={"Customer Management"},
-     *     summary="Create customer",
-     *     description="Create a new customer",
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name","email"},
-     *             @OA\Property(property="name", type="string", example="John Doe"),
-     *             @OA\Property(property="email", type="string", example="john@example.com"),
-     *             @OA\Property(property="phone", type="string", example="9876543210")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Customer created",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Customer created"),
-     *             @OA\Property(property="data", ref="#/components/schemas/CustomerManagement")
-     *         )
-     *     )
-     * )
-     */
-    public function store(CustomerManagementRequest $request)
+    public function store(CustomerManagementRequest $request): JsonResponse
     {
-        $item = $this->service->create($request->validated());
+        try {
+            $item = $this->service->create($request->validated());
 
-        return response()->json([
-            'message' => 'Customer created',
-            'data' => new CustomerManagementResource($item)
-        ], 201);
+            return response()->json([
+                'message' => 'Customer created',
+                'data' => new CustomerManagementResource($item),
+            ], 201);
+        } catch (Throwable $e) {
+            Log::error('Customer create failed', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Failed to create customer.'], 500);
+        }
     }
 
-    /**
-     * Get Customer by UUID
-     *
-     * @OA\Get(
-     *     path="/api/customers/{uuid}",
-     *     tags={"Customer Management"},
-     *     summary="Get customer details",
-     *     description="Fetch customer by UUID",
-     *     @OA\Parameter(
-     *         name="uuid",
-     *         in="path",
-     *         required=true,
-     *         description="Customer UUID",
-     *         @OA\Schema(type="string", example="550e8400-e29b-41d4-a716-446655440000")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Customer fetched",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Customer fetched"),
-     *             @OA\Property(property="data", ref="#/components/schemas/CustomerManagement")
-     *         )
-     *     )
-     * )
-     */
-    public function show($uuid)
+    public function show($uuid): JsonResponse
     {
-        $item = $this->service->getByUuid($uuid);
+        try {
+            $item = $this->service->getByUuid($uuid);
 
-        return response()->json([
-            'message' => 'Customer fetched',
-            'data' => new CustomerManagementResource($item)
-        ]);
+            return response()->json([
+                'message' => 'Customer fetched',
+                'data' => new CustomerManagementResource($item),
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Customer not found.'], 404);
+        } catch (Throwable $e) {
+            Log::error('Customer fetch failed', ['uuid' => $uuid, 'error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Failed to fetch customer.'], 500);
+        }
     }
 
-    /**
-     * Update Customer
-     *
-     * @OA\Put(
-     *     path="/api/customers/{uuid}",
-     *     tags={"Customer Management"},
-     *     summary="Update customer",
-     *     description="Update customer by UUID",
-     *     @OA\Parameter(
-     *         name="uuid",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name","email"},
-     *             @OA\Property(property="name", type="string", example="John Doe"),
-     *             @OA\Property(property="email", type="string", example="john@example.com"),
-     *             @OA\Property(property="phone", type="string", example="9876543210")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Customer updated",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Customer updated"),
-     *             @OA\Property(property="data", ref="#/components/schemas/CustomerManagement")
-     *         )
-     *     )
-     * )
-     */
-    public function update(CustomerManagementRequest $request, $uuid)
+    public function update(CustomerManagementRequest $request, $uuid): JsonResponse
     {
-        $item = $this->service->update($uuid, $request->validated());
+        try {
+            $item = $this->service->update($uuid, $request->validated());
 
-        return response()->json([
-            'message' => 'Customer updated',
-            'data' => new CustomerManagementResource($item)
-        ]);
+            return response()->json([
+                'message' => 'Customer updated',
+                'data' => new CustomerManagementResource($item),
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Customer not found.'], 404);
+        } catch (Throwable $e) {
+            Log::error('Customer update failed', ['uuid' => $uuid, 'error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Failed to update customer.'], 500);
+        }
     }
 
-    /**
-     * Delete Customer
-     *
-     * @OA\Delete(
-     *     path="/api/customers/{uuid}",
-     *     tags={"Customer Management"},
-     *     summary="Delete customer",
-     *     description="Delete customer by UUID",
-     *     @OA\Parameter(
-     *         name="uuid",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Customer deleted",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Customer deleted")
-     *         )
-     *     )
-     * )
-     */
-    public function destroy($uuid)
+    public function destroy($uuid): JsonResponse
     {
-        $this->service->delete($uuid);
+        try {
+            $this->service->delete($uuid);
 
-        return response()->json([
-            'message' => 'Customer deleted'
-        ]);
+            return response()->json(['message' => 'Customer deleted']);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Customer not found.'], 404);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        } catch (Throwable $e) {
+            Log::error('Customer delete failed', ['uuid' => $uuid, 'error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Failed to delete customer.'], 500);
+        }
     }
 }

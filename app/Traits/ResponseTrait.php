@@ -21,4 +21,9 @@ trait ResponseTrait
             'data' => $data
         ], $code);
     }
+
+    public function error($message = 'Failed', $code = 400, $data = [])
+    {
+        return $this->fail($message, $code, $data);
+    }
 }

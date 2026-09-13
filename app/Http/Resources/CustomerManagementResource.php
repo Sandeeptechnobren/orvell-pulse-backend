@@ -2,24 +2,37 @@
 
 namespace App\Http\Resources;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class CustomerManagementResource extends JsonResource
 {
-    public function toArray($request)
+    private const ONBOARDING_LABELS = [
+        0 => 'pending',
+        1 => 'in_progress',
+        2 => 'completed',
+    ];
+
+    public function toArray(Request $request): array
     {
         return [
-            'customer_code'                =>$this->id,
-            'uuid'              => $this->uuid,
-            'name'              => $this->name,
-            'phone_no'             => $this->whatsapp_number,
-            'whatsapp_no'   => $this->whatsapp_number,
-            'email'             => $this->email,
-            'address_1'           => $this->address,
-            'address_2'           => $this->country,
-            'zip_code'           => $this->zipcode,
+            'uuid' => $this->uuid,
+            'buyer_id' => $this->buyer_id,
+            'name' => $this->name,
+            'whatsapp_number' => $this->whatsapp_number,
+            'wa_id' => $this->wa_id,
+            'email' => $this->email,
+            'address' => $this->address,
+            'city' => $this->city,
+            'country' => $this->country,
+            'zipcode' => $this->zipcode,
+            'preferred_categories' => $this->preferred_categories,
             'onboarding_status' => $this->onboarding_status,
-            'meta'              => $this->meta ? json_decode($this->meta, true) : null,
+            'onboarding_status_label' => self::ONBOARDING_LABELS[$this->onboarding_status] ?? 'unknown',
+            'orders_count' => $this->whenCounted('orders'),
+            'meta' => $this->meta,
+            'created_at' => $this->created_at?->toDateTimeString(),
+            'updated_at' => $this->updated_at?->toDateTimeString(),
         ];
     }
 }
