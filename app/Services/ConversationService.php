@@ -43,7 +43,17 @@ class ConversationService
 
     private function formatMessages($messages): array
     {
-       return $messages->map(function ($message) {
+       return $messages
+        // Never feed fallback/error texts back as history: the model imitates
+        // its own past replies, so one stored placeholder poisons the whole
+        // conversation into repeating it forever.
+        ->reject(function ($message) {
+            return $message->from_me && str_contains(
+                (string) $message->text,
+                'configuration is currently in progress'
+            );
+        })
+        ->map(function ($message) {
             $text = trim((string) $message->text);
 
             // Media, stickers, reactions etc. arrive with no text. The API
