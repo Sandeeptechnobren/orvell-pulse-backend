@@ -17,8 +17,7 @@ class WhatsappMessageController extends Controller
 
     public function initialiseAgent(Request $request)
     {
-        Auth::user(); // ensure auth context
-
+        Auth::user();
         return $this->service->initialiseAgent();
     }
 

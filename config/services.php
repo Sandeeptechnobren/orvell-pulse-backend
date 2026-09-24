@@ -24,6 +24,9 @@ return [
     'customer_whapi' => [
         'token' => env('CUSTOMER_WHAPI_TOKEN'),
     ],
+    'admin_whapi' => [
+        'token' => env('ADMIN_WHAPI_TOKEN'),
+    ],
     'whapi' => [
         'base_url' => env(
             'WHAPI_BASE_URL',

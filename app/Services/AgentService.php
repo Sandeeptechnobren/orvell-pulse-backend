@@ -34,22 +34,22 @@ public function initialise(string $agentType)
         ];
         }
         else{
-        // $admin_token = config('services.admin_whapi.token');
-        // $response = Http::withHeaders([
-        //     'accept' => 'application/json',
-        //     'authorization' => 'Bearer ' . $admin_token,
-        // ])->get('https://gate.whapi.cloud/users/login', [
-        //     'wakeup' => 'true',
-        // ]);
-        // if ($response->successful()) {
-        //     $data = $response->json();
-        //     return $data;
-        // }
+        $admin_token = config('services.admin_whapi.token');
+        $response = Http::withHeaders([
+            'accept' => 'application/json',
+            'authorization' => 'Bearer ' . $admin_token,
+        ])->get('https://gate.whapi.cloud/users/login', [
+            'wakeup' => 'true',
+        ]);
+        if ($response->successful()) {
+            $data = $response->json();
+            return $data;
+        }
         return [
             'success' => false,
-            // 'status' => $response->status(),
-            // 'message' => $response->body(),
-            'message'=>"Admin Configuration in Progress! Please try again a later."
+            'status' => $response->status(),
+            'message' => $response->body(),
+            // 'message'=>"Admin Configuration in Progress! Please try again a later."
         ];
         }
     }
