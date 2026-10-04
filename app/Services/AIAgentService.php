@@ -21,11 +21,14 @@ class AIAgentService
         string $systemPrompt,
         array $history,
         array $currentMessages,
-        array $context = []
+        array $context = [],
+        ?object $toolHandler = null
     ): string {
         if (!$this->isConfigured()) {
             return $this->defaultResponse();
         }
+
+        $handler = $toolHandler ?? $this->toolHandler;
 
         // Token control: only the most recent turns ride along. Older context
         // rarely matters for a counter-service chat and costs on every call.
@@ -49,7 +52,7 @@ class AIAgentService
         }
 
         $client = new Client(apiKey: config('ai.anthropic.api_key'));
-        $tools = $this->toolHandler->definitions();
+        $tools = $handler->definitions();
 
         // Cache breakpoint on the system prompt: tools + system render before
         // messages, so this one stable prefix is shared across EVERY customer
@@ -80,7 +83,7 @@ class AIAgentService
                     $toolResults[] = [
                         'type' => 'tool_result',
                         'toolUseID' => $block->id,
-                        'content' => $this->toolHandler->execute(
+                        'content' => $handler->execute(
                             $block->name,
                             $block->input,
                             $context
@@ -129,15 +132,22 @@ class AIAgentService
         array $messages,
         array &$usage
     ) {
-        $response = $client->messages->create(
-            model: config('ai.anthropic.model', 'claude-opus-5'),
-            maxTokens: (int) config('ai.anthropic.max_reply_tokens', 1024),
-            system: $system,
-            tools: $tools,
-            messages: $messages,
-            outputConfig: ['effort' => config('ai.anthropic.effort', 'low')],
-            cacheControl: ['type' => 'ephemeral'],
-        );
+        $params = [
+            'model' => config('ai.anthropic.model', 'claude-opus-5'),
+            'maxTokens' => (int) config('ai.anthropic.max_reply_tokens', 1024),
+            'system' => $system,
+            'messages' => $messages,
+            'outputConfig' => ['effort' => config('ai.anthropic.effort', 'low')],
+            'cacheControl' => ['type' => 'ephemeral'],
+        ];
+
+        // A handler may expose no tools yet - the API expects the parameter
+        // to be omitted rather than an empty list.
+        if (!empty($tools)) {
+            $params['tools'] = $tools;
+        }
+
+        $response = $client->messages->create(...$params);
 
         $usage['input'] += $response->usage->inputTokens ?? 0;
         $usage['output'] += $response->usage->outputTokens ?? 0;

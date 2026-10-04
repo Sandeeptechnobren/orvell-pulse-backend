@@ -27,7 +27,8 @@ class ProcessAdminConversation implements ShouldQueue
         ConversationService $conversationService,
         AgentPromptService $agentPromptService,
         AIAgentService $aiAgentService,
-        WhatsAppService $whatsAppService
+        WhatsAppService $whatsAppService,
+        \App\Services\Ai\StaffToolHandler $staffTools
     ): void {
         $conversation = DB::transaction(function () {
             $conversation = Conversation::lockForUpdate()
@@ -63,26 +64,40 @@ class ProcessAdminConversation implements ShouldQueue
                 $this->releaseConversation($conversation);
                 return;
             }
-            $prompt = $agentPromptService->getAdminPrompt(
-                $this->clientId
-            );
 
-            $profileName = Message::where('conversation_id', $conversation->id)
-                ->where('from_me', false)
-                ->whereNotNull('from_name')
-                ->latest('id')
-                ->value('from_name');
+            // Hard gate: the admin line serves registered staff only. Unknown
+            // numbers get a fixed refusal - no AI call, no tokens spent.
+            $staff = $staffTools->resolveStaff([
+                'whatsapp_number' => $conversation->sender,
+            ]);
 
-            $response = $aiAgentService->generate(
-                $prompt->prompt_description,
-                $context['history'],
-                $context['current_messages'],
-                [
-                    'whatsapp_number' => $conversation->sender,
-                    'wa_id' => $conversation->chat_id ?? $conversation->sender,
-                    'profile_name' => $profileName,
-                ]
-            );
+            if (!$staff) {
+                $response = 'This WhatsApp line is for Orvell staff only. '
+                    . 'If you are a customer, please contact us on our customer line. Thank you 🙏';
+
+                logger()->warning('Admin line message from unregistered number', [
+                    'line' => 'admin',
+                    'conversation_id' => $conversation->id,
+                    'sender' => $conversation->sender,
+                ]);
+            } else {
+                $prompt = $agentPromptService->getPrompt($this->clientId, 'admin');
+                $promptText = $prompt?->prompt_description
+                    ?? $agentPromptService->getDefaultPrompt('admin');
+
+                $response = $aiAgentService->generate(
+                    $promptText,
+                    $context['history'],
+                    $context['current_messages'],
+                    [
+                        'whatsapp_number' => $conversation->sender,
+                        'wa_id' => $conversation->chat_id ?? $conversation->sender,
+                        'profile_name' => $staff->name,
+                        'staff_id' => $staff->id,
+                    ],
+                    $staffTools
+                );
+            }
             $aiMessage = Message::create([
                 'conversation_id' => $conversation->id,
                 'message_id' => (string) Str::uuid(),
@@ -118,6 +133,7 @@ class ProcessAdminConversation implements ShouldQueue
                 ]);
             $this->releaseConversation($conversation);
             logger()->info('Conversation processed successfully', [
+                'line' => 'admin',
                 'conversation_id' => $conversation->id,
                 'sender' => $conversation->sender,
                 'ai_message_id' => $aiMessage->id,
@@ -125,6 +141,7 @@ class ProcessAdminConversation implements ShouldQueue
         } catch (\Throwable $exception) {
             $this->releaseConversation($conversation);
             logger()->error('Conversation processing failed', [
+                'line' => 'admin',
                 'conversation_id' => $conversation->id,
                 'sender' => $conversation->sender,
                 'error' => $exception->getMessage(),
