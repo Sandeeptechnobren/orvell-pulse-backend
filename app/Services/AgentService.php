@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Http;
 class AgentService
 {
     public function __construct(
-        private MessageService $messages,
         private AgentPromptService $prompts,
     ) {
     }
