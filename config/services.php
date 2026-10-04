@@ -32,7 +32,6 @@ return [
             'WHAPI_BASE_URL',
             'https://gate.whapi.cloud'
         ),
-        // 'token' => env('CUSTOMER_WHAPI_TOKEN'),
     ],
 
 ];

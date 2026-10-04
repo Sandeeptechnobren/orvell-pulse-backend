@@ -26,6 +26,7 @@ Route::post('/password-reset', [AuthController::class, 'passwordResetFlow']);
 Route::get('Country', [CountryController::class, 'countries']);
 
 Route::post('/webhook/receive', [GetMessageWebhookController::class, 'receive']);
+Route::post('/webhook/receiveadmin', [GetMessageWebhookController::class, 'receiveadmin']);
 Route::post('webhooks/paystack', [PaystackWebhookController::class, 'handle']);
 
 Route::middleware('auth:sanctum')->group(function () {

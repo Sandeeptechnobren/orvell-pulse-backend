@@ -23,7 +23,22 @@ class AgentPromptService
 
         return $prompt;
     }
+    public function getAdminPrompt(int $clientId): agentPrompt
+    {
+        $prompt = agentPrompt::query()
+            ->where('client_id', $clientId)
+            ->where('prompt_for', 'admin')
+            ->latest('updated_at')
+            ->first();
 
+        if (!$prompt) {
+            throw new RuntimeException(
+                "Admin AI prompt not found for client {$clientId}."
+            );
+        }
+
+        return $prompt;
+    }
     public function getPrompt(int $clientId, string $promptFor): ?agentPrompt
     {
         return agentPrompt::query()

@@ -18,4 +18,13 @@ class GetMessageWebhookController extends Controller{
             'data' => $result,
         ]);
     }
+    public function receiveadmin(Request $request)
+    {
+        $result = $this->webhookService->receiveadmin($request);
+        return response()->json([
+            'status' => true,
+            'message' => 'Webhook received successfully',
+            'data' => $result,
+        ]);
+    }
 }

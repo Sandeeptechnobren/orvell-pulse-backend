@@ -39,11 +39,38 @@ class WhatsAppService
 
         return $response->json();
     }
+    public function sendAdminText(
+        string $chatId,
+        string $message
+    ): array {
+        $token = config('services.admin_whapi.token');
 
-    /**
-     * Send a document (e.g. a PDF invoice) as an in-chat attachment. The file
-     * travels as base64 - it is never exposed on a public URL.
-     */
+        if (!$token) {
+            throw new RuntimeException(
+                'WHAPI_TOKEN is not configured.'
+            );
+        }
+
+        $response = Http::baseUrl(
+            config('services.whapi.base_url')
+        )
+            ->withToken($token)
+            ->acceptJson()
+            ->timeout(30)
+            ->post('/messages/text', [
+                'to' => $chatId,
+                'body' => $message,
+            ]);
+
+        if ($response->failed()) {
+            throw new RuntimeException(
+                'WhatsApp message failed: ' .
+                $response->body()
+            );
+        }
+
+        return $response->json();
+    }
     public function sendDocument(
         string $chatId,
         string $binaryContent,
