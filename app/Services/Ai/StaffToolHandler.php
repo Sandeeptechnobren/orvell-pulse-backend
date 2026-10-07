@@ -72,7 +72,7 @@ class StaffToolHandler
                         'state' => ['type' => 'string'],
                         'country' => ['type' => 'string'],
                     ],
-                    'required' => ['name'],
+                    'required' => ['name', 'phone_no', 'email','address'],
                 ],
             ],
             [
@@ -91,7 +91,7 @@ class StaffToolHandler
                         'status' => ['type' => 'string', 'enum' => ['in_transit', 'arrived', 'received'], 'description' => 'Defaults to arrived'],
                         'notes' => ['type' => 'string'],
                     ],
-                    'required' => ['supplier'],
+                    'required' => ['supplier','arrival_date','status'],
                 ],
             ],
             [
