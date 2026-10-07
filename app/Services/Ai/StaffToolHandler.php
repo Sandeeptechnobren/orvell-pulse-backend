@@ -76,6 +76,55 @@ class StaffToolHandler
                 ],
             ],
             [
+                'name' => 'update_supplier',
+                'description' => 'Update a registered supplier\'s details (name, phone, email, address, district, state, country). Only the mentioned fields change. Confirm the change with the staff member before calling.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'supplier' => ['type' => 'string', 'description' => 'Supplier code or current name'],
+                        'name' => ['type' => 'string'],
+                        'phone_no' => ['type' => 'string'],
+                        'email' => ['type' => 'string'],
+                        'address' => ['type' => 'string'],
+                        'district' => ['type' => 'string'],
+                        'state' => ['type' => 'string'],
+                        'country' => ['type' => 'string'],
+                    ],
+                    'required' => ['supplier'],
+                ],
+            ],
+            [
+                'name' => 'update_container',
+                'description' => 'Update a container\'s status (in_transit/arrived/received/closed), arrival date, received date or notes. Confirm before calling.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'container_code' => ['type' => 'string'],
+                        'status' => ['type' => 'string', 'enum' => ['in_transit', 'arrived', 'received', 'closed']],
+                        'arrival_date' => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
+                        'received_date' => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
+                        'notes' => ['type' => 'string'],
+                    ],
+                    'required' => ['container_code'],
+                ],
+            ],
+            [
+                'name' => 'update_customer',
+                'description' => 'Update any customer\'s details (name, email, address, city, country) by Buyer ID or WhatsApp number. The Buyer ID and WhatsApp number themselves cannot be changed. Confirm before calling.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'customer' => ['type' => 'string', 'description' => 'Buyer ID or WhatsApp number'],
+                        'name' => ['type' => 'string'],
+                        'email' => ['type' => 'string'],
+                        'address' => ['type' => 'string'],
+                        'city' => ['type' => 'string'],
+                        'country' => ['type' => 'string'],
+                    ],
+                    'required' => ['customer'],
+                ],
+            ],
+            [
                 'name' => 'list_containers',
                 'description' => 'List containers with supplier, status, arrival date and current available stock. Use to find the right container before registering stock.',
                 'inputSchema' => ['type' => 'object', 'properties' => new \stdClass()],
@@ -294,6 +343,9 @@ class StaffToolHandler
                 'get_categories' => ['categories' => Item_category::select('id', 'category_name')->orderBy('category_name')->get()],
                 'list_suppliers' => $this->listSuppliers(),
                 'register_supplier' => $this->registerSupplier($input),
+                'update_supplier' => $this->updateSupplier($input),
+                'update_container' => $this->updateContainer($input),
+                'update_customer' => $this->updateCustomer($input),
                 'list_containers' => $this->listContainers(),
                 'register_container' => $this->registerContainer($input, $staff),
                 'register_stock' => $this->registerStock($input),
@@ -398,6 +450,107 @@ class StaffToolHandler
             'supplier_code' => $supplier->supplier_code,
             'name' => $supplier->name,
             'note' => 'Containers can now be registered under this supplier.',
+        ];
+    }
+
+    private function updateSupplier(array $input): array
+    {
+        $query = trim((string) ($input['supplier'] ?? ''));
+        $supplier = Supplier::where('supplier_code', $query)
+            ->orWhereRaw('LOWER(name) = ?', [mb_strtolower($query)])
+            ->first();
+
+        if (!$supplier) {
+            return ['error' => "Supplier '{$query}' not found."];
+        }
+
+        // SupplierService::updateSupplier overwrites every field, so merge the
+        // current values in - only the mentioned fields actually change.
+        $updated = $this->suppliers->updateSupplier($supplier, [
+            'supplier_code' => $supplier->supplier_code,
+            'name' => $input['name'] ?? $supplier->name,
+            'phone_no' => $input['phone_no'] ?? $supplier->phone_no,
+            'email' => $input['email'] ?? $supplier->email,
+            'address_1' => $input['address'] ?? $supplier->address_1,
+            'address_2' => $supplier->address_2,
+            'district' => $input['district'] ?? $supplier->district,
+            'state' => $input['state'] ?? $supplier->state,
+            'zip_code' => $supplier->zip_code,
+            'country' => $input['country'] ?? $supplier->country,
+        ]);
+
+        return [
+            'updated' => true,
+            'supplier_code' => $updated->supplier_code,
+            'name' => $updated->name,
+            'phone' => $updated->phone_no,
+            'email' => $updated->email,
+            'location' => trim(implode(', ', array_filter([$updated->district, $updated->state, $updated->country]))),
+        ];
+    }
+
+    private function updateContainer(array $input): array
+    {
+        $container = Container::where('container_id', trim((string) ($input['container_code'] ?? '')))->first();
+        if (!$container) {
+            return ['error' => "Container '{$input['container_code']}' not found."];
+        }
+
+        $changes = array_intersect_key(
+            $input,
+            array_flip(['status', 'arrival_date', 'received_date', 'notes'])
+        );
+
+        if (empty($changes)) {
+            return ['error' => 'Nothing to update - provide status, arrival_date, received_date or notes.'];
+        }
+
+        if (isset($changes['status'])
+            && !in_array($changes['status'], ['in_transit', 'arrived', 'received', 'closed'], true)
+        ) {
+            return ['error' => 'Status must be one of: in_transit, arrived, received, closed.'];
+        }
+
+        $updated = $this->containers->update($container, $changes);
+
+        return [
+            'updated' => true,
+            'container_code' => $updated->container_id,
+            'status' => $updated->status,
+            'arrival_date' => $updated->arrival_date?->format('Y-m-d'),
+            'received_date' => $updated->received_date?->format('Y-m-d'),
+        ];
+    }
+
+    private function updateCustomer(array $input): array
+    {
+        $query = trim((string) ($input['customer'] ?? ''));
+        $customer = Customer::where('buyer_id', $query)
+            ->orWhere('whatsapp_number', preg_replace('/[^0-9]/', '', $query))
+            ->first();
+
+        if (!$customer) {
+            return ['error' => "Customer '{$query}' not found."];
+        }
+
+        $changes = array_intersect_key(
+            $input,
+            array_flip(['name', 'email', 'address', 'city', 'country'])
+        );
+
+        if (empty($changes)) {
+            return ['error' => 'Nothing to update - provide name, email, address, city or country.'];
+        }
+
+        $updated = app(\App\Services\CustomerManagementService::class)
+            ->update($customer->uuid, $changes);
+
+        return [
+            'updated' => true,
+            'buyer_id' => $updated->buyer_id,
+            'name' => $updated->name,
+            'city' => $updated->city,
+            'email' => $updated->email,
         ];
     }
 
