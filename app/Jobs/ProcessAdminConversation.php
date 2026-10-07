@@ -16,13 +16,11 @@ use App\Services\WhatsAppService;
 class ProcessAdminConversation implements ShouldQueue
 {
     use Queueable;
-
     public function __construct(
         public int $conversationId,
         public string $scheduledAt,
         public int $clientId
     ) {}
-
     public function handle(
         ConversationService $conversationService,
         AgentPromptService $agentPromptService,
@@ -31,8 +29,7 @@ class ProcessAdminConversation implements ShouldQueue
         \App\Services\Ai\StaffToolHandler $staffTools
     ): void {
         $conversation = DB::transaction(function () {
-            $conversation = Conversation::lockForUpdate()
-                ->find($this->conversationId);
+            $conversation = Conversation::lockForUpdate()->find($this->conversationId);
             if (!$conversation) {
                 return null;
             }
@@ -64,13 +61,9 @@ class ProcessAdminConversation implements ShouldQueue
                 $this->releaseConversation($conversation);
                 return;
             }
-
-            // Hard gate: the admin line serves registered staff only. Unknown
-            // numbers get a fixed refusal - no AI call, no tokens spent.
             $staff = $staffTools->resolveStaff([
                 'whatsapp_number' => $conversation->sender,
             ]);
-
             if (!$staff) {
                 $response = 'This WhatsApp line is for Orvell staff only. '
                     . 'If you are a customer, please contact us on our customer line. Thank you 🙏';

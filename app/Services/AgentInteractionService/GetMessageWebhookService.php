@@ -126,7 +126,6 @@ class GetMessageWebhookService
                         'messages_stored' => 0,
                     ];
                 }
-
                 if (!isset($payload['messages']) || !is_array($payload['messages'])) {
                     throw new InvalidArgumentException('Invalid webhook payload.');
                 }
