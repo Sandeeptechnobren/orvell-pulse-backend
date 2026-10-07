@@ -227,7 +227,6 @@ class SupplierService
             return $supplier;
         } catch (Throwable $e) {
             DB::rollBack();
-            dd($e);
             Log::error('Failed to create supplier.', [
                 'data' => $data,
                 'error' => $e->getMessage(),

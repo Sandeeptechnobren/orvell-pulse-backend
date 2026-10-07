@@ -15,6 +15,9 @@ use App\Services\ExpenseService;
 use App\Services\OrderRequestService;
 use App\Services\PaymentService;
 use App\Services\SaleService;
+use App\Services\ContainerService;
+use App\Services\SupplierManagement\SupplierService;
+use App\Models\Supplier;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -26,7 +29,9 @@ class StaffToolHandler
         private readonly ExpenseService $expenses,
         private readonly OrderRequestService $orderRequests,
         private readonly PaymentService $payments,
-        private readonly SaleService $sales
+        private readonly SaleService $sales,
+        private readonly ContainerService $containers,
+        private readonly SupplierService $suppliers
     ) {
     }
 
@@ -47,6 +52,47 @@ class StaffToolHandler
                 'name' => 'get_categories',
                 'description' => 'List bale categories with their IDs. Use to convert category names into IDs for other tools.',
                 'inputSchema' => ['type' => 'object', 'properties' => new \stdClass()],
+            ],
+            [
+                'name' => 'list_suppliers',
+                'description' => 'List registered suppliers with their codes and container counts.',
+                'inputSchema' => ['type' => 'object', 'properties' => new \stdClass()],
+            ],
+            [
+                'name' => 'register_supplier',
+                'description' => 'Register a new supplier AFTER confirming the details with the staff member. The supplier code is generated automatically. Name is required; collect phone, email, city/district, state and country if offered.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Supplier/company name (required)'],
+                        'phone_no' => ['type' => 'string'],
+                        'email' => ['type' => 'string'],
+                        'address' => ['type' => 'string'],
+                        'district' => ['type' => 'string', 'description' => 'City or district'],
+                        'state' => ['type' => 'string'],
+                        'country' => ['type' => 'string'],
+                    ],
+                    'required' => ['name'],
+                ],
+            ],
+            [
+                'name' => 'list_containers',
+                'description' => 'List containers with supplier, status, arrival date and current available stock. Use to find the right container before registering stock.',
+                'inputSchema' => ['type' => 'object', 'properties' => new \stdClass()],
+            ],
+            [
+                'name' => 'register_container',
+                'description' => 'Register a new container under a supplier AFTER confirming. The container code (CNT-YYYY-XXXX) is generated automatically. Then stock can be registered into it with register_stock.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'supplier' => ['type' => 'string', 'description' => 'Supplier code (e.g. ORV-2026-0001) or supplier name'],
+                        'arrival_date' => ['type' => 'string', 'description' => 'YYYY-MM-DD, defaults to today'],
+                        'status' => ['type' => 'string', 'enum' => ['in_transit', 'arrived', 'received'], 'description' => 'Defaults to arrived'],
+                        'notes' => ['type' => 'string'],
+                    ],
+                    'required' => ['supplier'],
+                ],
             ],
             [
                 'name' => 'register_stock',
@@ -246,6 +292,10 @@ class StaffToolHandler
                 'get_business_summary' => $this->dashboard->summary(),
                 'get_stock' => ['stock' => $this->bales->stockSummary()],
                 'get_categories' => ['categories' => Item_category::select('id', 'category_name')->orderBy('category_name')->get()],
+                'list_suppliers' => $this->listSuppliers(),
+                'register_supplier' => $this->registerSupplier($input),
+                'list_containers' => $this->listContainers(),
+                'register_container' => $this->registerContainer($input, $staff),
                 'register_stock' => $this->registerStock($input),
                 'adjust_stock' => $this->adjustStock($input),
                 'get_pending_requests' => $this->pendingRequests(),
@@ -297,6 +347,123 @@ class StaffToolHandler
         }
 
         return User::where('whatsapp_number', $number)->first();
+    }
+
+    private function listSuppliers(): array
+    {
+        $suppliers = Supplier::query()
+            ->withCount('containers')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($s) => [
+                'supplier_code' => $s->supplier_code,
+                'name' => $s->name,
+                'phone' => $s->phone_no,
+                'location' => trim(implode(', ', array_filter([$s->district, $s->state, $s->country]))),
+                'containers' => $s->containers_count,
+            ]);
+
+        return $suppliers->isEmpty()
+            ? ['suppliers' => [], 'note' => 'No suppliers registered yet.']
+            : ['suppliers' => $suppliers];
+    }
+
+    private function registerSupplier(array $input): array
+    {
+        $name = trim((string) ($input['name'] ?? ''));
+        if ($name === '') {
+            return ['error' => 'Supplier name is required.'];
+        }
+
+        $existing = Supplier::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
+        if ($existing) {
+            return [
+                'error' => "A supplier named '{$existing->name}' already exists ({$existing->supplier_code}). Ask the staff member whether they meant that one.",
+            ];
+        }
+
+        $supplier = $this->suppliers->createSupplier([
+            'supplier_code' => $this->nextSupplierCode(),
+            'name' => $name,
+            'phone_no' => $input['phone_no'] ?? null,
+            'email' => $input['email'] ?? null,
+            'address_1' => $input['address'] ?? null,
+            'district' => $input['district'] ?? null,
+            'state' => $input['state'] ?? null,
+            'country' => $input['country'] ?? null,
+        ]);
+
+        return [
+            'registered' => true,
+            'supplier_code' => $supplier->supplier_code,
+            'name' => $supplier->name,
+            'note' => 'Containers can now be registered under this supplier.',
+        ];
+    }
+
+    private function listContainers(): array
+    {
+        $available = BaleBatch::selectRaw('container_id, SUM(qty_available) as available')
+            ->groupBy('container_id')
+            ->pluck('available', 'container_id');
+
+        $containers = Container::with('supplier')
+            ->orderByDesc('arrival_date')
+            ->limit(20)
+            ->get()
+            ->map(fn ($c) => [
+                'container_code' => $c->container_id,
+                'supplier' => $c->supplier?->name,
+                'status' => $c->status,
+                'arrival_date' => $c->arrival_date?->format('Y-m-d'),
+                'bales_available' => (int) ($available[$c->id] ?? 0),
+            ]);
+
+        return $containers->isEmpty()
+            ? ['containers' => [], 'note' => 'No containers registered yet.']
+            : ['containers' => $containers];
+    }
+
+    private function registerContainer(array $input, User $staff): array
+    {
+        $query = trim((string) ($input['supplier'] ?? ''));
+        $supplier = Supplier::where('supplier_code', $query)
+            ->orWhereRaw('LOWER(name) = ?', [mb_strtolower($query)])
+            ->first();
+
+        if (!$supplier) {
+            return ['error' => "Supplier '{$query}' not found. Use list_suppliers to see codes, or register the supplier first."];
+        }
+
+        $container = $this->containers->create([
+            'supplier_id' => $supplier->id,
+            'arrival_date' => $input['arrival_date'] ?? now()->toDateString(),
+            'status' => $input['status'] ?? 'arrived',
+            'notes' => $input['notes'] ?? null,
+        ], $staff->id);
+
+        return [
+            'registered' => true,
+            'container_code' => $container->container_id,
+            'supplier' => $supplier->name,
+            'note' => 'Stock can now be registered into this container with register_stock.',
+        ];
+    }
+
+    private function nextSupplierCode(): string
+    {
+        $year = now()->format('Y');
+        $max = Supplier::pluck('supplier_code')
+            ->map(function ($code) {
+                return preg_match('/(\d{1,4})$/', (string) $code, $m) ? (int) $m[1] : 0;
+            })
+            ->max() ?? 0;
+
+        do {
+            $code = sprintf('ORV-%s-%04d', $year, ++$max);
+        } while (Supplier::where('supplier_code', $code)->exists());
+
+        return $code;
     }
 
     private function registerStock(array $input): array
