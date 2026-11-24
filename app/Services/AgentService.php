@@ -15,27 +15,13 @@ class AgentService
 public function initialise(string $agentType)
     {
         if($agentType=="customer"){
-        // $customer_token = config('services.customer_whapi.token');
-        // $response = Http::withHeaders([
-        //     'accept' => 'application/json',
-        //     'authorization' => 'Bearer ' . $customer_token,
-        // ])->get('https://gate.whapi.cloud/users/login', [
-        //     'wakeup' => 'true',
-        // ]);
-        // if ($response->successful()) {
-        //     $data = $response->json();
-        //     return $data;
-        // }
-        // return [
-        //     'success' => false,
-        //     'status' => $response->status(),
-        //     'message' => $response->body(),
-        // ];
         $response = Http::withHeaders([
         'accept' => 'image/png',
-            ])->get('https://heywave.kineticsoftwaresolution.com/api/instance/qrpng/customer_line', [
-                'token' => 'inst_41723cee9d0eef70c26abf3dbeb2348039ad0c294839e36b',
-            ]);
+            ])->get(
+                config('services.heywave.base_url') . '/instance/qrpng/'
+                    . config('services.heywave.customer.instance_id'),
+                ['token' => config('services.heywave.customer.token')]
+            );
 
             if ($response->successful()) {
                 return response($response->body(), 200)
@@ -50,33 +36,13 @@ public function initialise(string $agentType)
             ], $response->status());
         }
         else{
-        // $admin_token = config('services.admin_whapi.token');
-        // // $response = Http::withHeaders([
-        // //     'accept' => 'application/json',
-        // //     'authorization' => 'Bearer ' . $admin_token,
-        // // ])->get('https://gate.whapi.cloud/users/login', [
-        // //     'wakeup' => 'true',
-        // // ]);
-        // $response = Http::withHeaders([
-        //     'accept' => 'application/json',
-        //     // 'authorization' => 'Bearer ' . $admin_token,
-        // ])->get('https://heywave.kineticsoftwaresolution.com/api/instance/qrpng/admin_line', [
-        //     'token' => 'inst_d74a1c6fca3aad8bcc97efb40f1c7a0ca2212bdc7b39afbb',
-        // ]);
-        // if ($response->successful()) {
-        //     $data = $response->json();
-        //     return $data;
-        // }
-        // return [
-        //     'success' => false,
-        //     'status' => $response->status(),
-        //     'message' => $response->body(),
-        // ];
         $response = Http::withHeaders([
         'accept' => 'image/png',
-            ])->get('https://heywave.kineticsoftwaresolution.com/api/instance/qrpng/admin_line', [
-                'token' => 'inst_d74a1c6fca3aad8bcc97efb40f1c7a0ca2212bdc7b39afbb',
-            ]);
+            ])->get(
+                config('services.heywave.base_url') . '/instance/qrpng/'
+                    . config('services.heywave.admin.instance_id'),
+                ['token' => config('services.heywave.admin.token')]
+            );
 
             if ($response->successful()) {
                 return response($response->body(), 200)
