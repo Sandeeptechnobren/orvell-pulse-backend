@@ -15,41 +15,80 @@ class AgentService
 public function initialise(string $agentType)
     {
         if($agentType=="customer"){
-        $customer_token = config('services.customer_whapi.token');
+        // $customer_token = config('services.customer_whapi.token');
+        // $response = Http::withHeaders([
+        //     'accept' => 'application/json',
+        //     'authorization' => 'Bearer ' . $customer_token,
+        // ])->get('https://gate.whapi.cloud/users/login', [
+        //     'wakeup' => 'true',
+        // ]);
+        // if ($response->successful()) {
+        //     $data = $response->json();
+        //     return $data;
+        // }
+        // return [
+        //     'success' => false,
+        //     'status' => $response->status(),
+        //     'message' => $response->body(),
+        // ];
         $response = Http::withHeaders([
-            'accept' => 'application/json',
-            'authorization' => 'Bearer ' . $customer_token,
-        ])->get('https://gate.whapi.cloud/users/login', [
-            'wakeup' => 'true',
-        ]);
-        if ($response->successful()) {
-            $data = $response->json();
-            return $data;
-        }
-        return [
-            'success' => false,
-            'status' => $response->status(),
-            'message' => $response->body(),
-        ];
+        'accept' => 'image/png',
+            ])->get('https://heywave.kineticsoftwaresolution.com/api/instance/qrpng/customer_line', [
+                'token' => 'inst_41723cee9d0eef70c26abf3dbeb2348039ad0c294839e36b',
+            ]);
+
+            if ($response->successful()) {
+                return response($response->body(), 200)
+                    ->header('Content-Type', $response->header('Content-Type', 'image/png'))
+                    ->header('Cache-Control', 'no-cache, no-store, must-revalidate');
+            }
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Unable to fetch QR image',
+                'error' => $response->body(),
+            ], $response->status());
         }
         else{
-        $admin_token = config('services.admin_whapi.token');
+        // $admin_token = config('services.admin_whapi.token');
+        // // $response = Http::withHeaders([
+        // //     'accept' => 'application/json',
+        // //     'authorization' => 'Bearer ' . $admin_token,
+        // // ])->get('https://gate.whapi.cloud/users/login', [
+        // //     'wakeup' => 'true',
+        // // ]);
+        // $response = Http::withHeaders([
+        //     'accept' => 'application/json',
+        //     // 'authorization' => 'Bearer ' . $admin_token,
+        // ])->get('https://heywave.kineticsoftwaresolution.com/api/instance/qrpng/admin_line', [
+        //     'token' => 'inst_d74a1c6fca3aad8bcc97efb40f1c7a0ca2212bdc7b39afbb',
+        // ]);
+        // if ($response->successful()) {
+        //     $data = $response->json();
+        //     return $data;
+        // }
+        // return [
+        //     'success' => false,
+        //     'status' => $response->status(),
+        //     'message' => $response->body(),
+        // ];
         $response = Http::withHeaders([
-            'accept' => 'application/json',
-            'authorization' => 'Bearer ' . $admin_token,
-        ])->get('https://gate.whapi.cloud/users/login', [
-            'wakeup' => 'true',
-        ]);
-        if ($response->successful()) {
-            $data = $response->json();
-            return $data;
-        }
-        return [
-            'success' => false,
-            'status' => $response->status(),
-            'message' => $response->body(),
-            // 'message'=>"Admin Configuration in Progress! Please try again a later."
-        ];
+        'accept' => 'image/png',
+            ])->get('https://heywave.kineticsoftwaresolution.com/api/instance/qrpng/admin_line', [
+                'token' => 'inst_d74a1c6fca3aad8bcc97efb40f1c7a0ca2212bdc7b39afbb',
+            ]);
+
+            if ($response->successful()) {
+                return response($response->body(), 200)
+                    ->header('Content-Type', $response->header('Content-Type', 'image/png'))
+                    ->header('Cache-Control', 'no-cache, no-store, must-revalidate');
+            }
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Unable to fetch QR image',
+                'error' => $response->body(),
+            ], $response->status());
         }
     }
 
