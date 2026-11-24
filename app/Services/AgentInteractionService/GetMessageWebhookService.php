@@ -14,7 +14,7 @@ class GetMessageWebhookService
     public function receive(Request $request): array
         {
             try {
-                $payload = $request->all();
+                $payload = $this->normalizeHeywave($request->all());
                 if (($payload['event']['type'] ?? null) === 'statuses') {
                     return [
                         'status' => true,
@@ -119,7 +119,7 @@ class GetMessageWebhookService
     public function receiveadmin(Request $request): array
         {
             try {
-                $payload = $request->all();
+                $payload = $this->normalizeHeywave($request->all());
                 if (($payload['event']['type'] ?? null) === 'statuses') {
                     return [
                         'status' => true,
@@ -220,4 +220,63 @@ class GetMessageWebhookService
                 throw $e;
             }
         }
+
+    /**
+     * Heywave posts a single message per webhook:
+     *   { event: "message", instance: "...", data: { fromNumber, body, ... } }
+     * Translate it into the legacy multi-message shape the storage loop
+     * expects, so both gateway formats work during the cutover.
+     *
+     * Notes on the mapping:
+     * - data.fromNumber is the real phone number; data.from is an internal
+     *   @lid identifier and must NOT be used for replies.
+     * - Heywave sends no message id, so a deterministic hash provides
+     *   idempotency across webhook retries.
+     * - Non-"message" events and group chats are mapped to the statuses
+     *   shape, which the handlers already skip gracefully.
+     */
+    private function normalizeHeywave(array $payload): array
+    {
+        if (!isset($payload['data']) || !array_key_exists('event', $payload) || isset($payload['messages'])) {
+            return $payload; // Not a Heywave payload - leave untouched.
+        }
+
+        $data = $payload['data'];
+        $skip = ['event' => ['type' => 'statuses', 'event' => 'post']];
+
+        if (($payload['event'] ?? null) !== 'message') {
+            return $skip;
+        }
+
+        if (!empty($data['isGroup'])) {
+            return $skip;
+        }
+
+        $fromNumber = preg_replace('/[^0-9]/', '', (string) ($data['fromNumber'] ?? ''));
+        if ($fromNumber === '') {
+            return $skip;
+        }
+
+        $type = (string) ($data['type'] ?? 'chat');
+        $body = (string) ($data['body'] ?? '');
+
+        return [
+            'channel_id' => $payload['instance'] ?? 'heywave',
+            'event' => ['type' => 'messages', 'event' => 'post'],
+            'messages' => [[
+                'id' => 'hw-' . md5(
+                    ($payload['instance'] ?? '') . '|' . $fromNumber . '|'
+                    . ($data['timestamp'] ?? '') . '|' . $body
+                ),
+                'from' => $fromNumber,
+                'chat_id' => $fromNumber,
+                'from_me' => false,
+                'type' => $type === 'chat' ? 'text' : $type,
+                'timestamp' => $data['timestamp'] ?? now()->timestamp,
+                'source' => 'heywave',
+                'text' => ['body' => $body !== '' ? $body : null],
+                'from_name' => $data['author'] ?? null,
+            ]],
+        ];
+    }
 }
