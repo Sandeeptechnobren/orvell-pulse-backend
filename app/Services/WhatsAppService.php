@@ -54,8 +54,8 @@ class WhatsAppService
         $payload = [
             'token' => $token,
             'number' => $this->normalizeNumber($chatId),
-            'media' => 'data:' . $mimeType . ';name=' . $filename . ';base64,'
-                . base64_encode($binaryContent),
+            'base64' => 'data:' . $mimeType . ';base64,' . base64_encode($binaryContent),
+            'mimetype' => $mimeType,
             'filename' => $filename,
         ];
 
