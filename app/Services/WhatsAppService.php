@@ -54,7 +54,9 @@ class WhatsAppService
         $payload = [
             'token' => $token,
             'number' => $this->normalizeNumber($chatId),
-            'base64' => 'data:' . $mimeType . ';base64,' . base64_encode($binaryContent),
+            // Heywave's docs show a data: URI here, but in practice the API
+            // treats the field as raw base64 - the prefix corrupts the file.
+            'base64' => base64_encode($binaryContent),
             'mimetype' => $mimeType,
             'filename' => $filename,
         ];
