@@ -74,23 +74,23 @@ class SendPaymentNotification implements ShouldQueue
 
         $whatsAppService->sendText($chatId, $message);
 
-        if ($isPaid) {
-            try {
-                $pdf = $invoicePdfService->generate($invoice);
-                $whatsAppService->sendDocument(
-                    $chatId,
-                    $pdf,
-                    $invoicePdfService->filename($invoice),
-                    "Invoice {$invoice->invoice_number} - Orvell"
-                );
-            } catch (Throwable $e) {
-                // The receipt text already went out - do not retry the whole
-                // job (that would duplicate the text). Log and move on.
-                Log::error('Invoice PDF send failed', [
-                    'invoice' => $invoice->invoice_number,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        // The PDF invoice goes out on EVERY payment - partial payments too.
+        // The document itself shows the live paid amount and balance due.
+        try {
+            $pdf = $invoicePdfService->generate($invoice);
+            $whatsAppService->sendDocument(
+                $chatId,
+                $pdf,
+                $invoicePdfService->filename($invoice),
+                "Invoice {$invoice->invoice_number} - Orvell"
+            );
+        } catch (Throwable $e) {
+            // The receipt text already went out - do not retry the whole
+            // job (that would duplicate the text). Log and move on.
+            Log::error('Invoice PDF send failed', [
+                'invoice' => $invoice->invoice_number,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         $payment->forceFill(['notified_at' => now()])->save();
