@@ -33,5 +33,19 @@ return [
             'https://gate.whapi.cloud'
         ),
     ],
+    'heywave' => [
+        'base_url' => env(
+            'HEYWAVE_BASE_URL',
+            'https://heywave.kineticsoftwaresolution.com/api'
+        ),
+        'customer' => [
+            'instance_id' => env('HEYWAVE_CUSTOMER_INSTANCE_ID'),
+            'token' => env('HEYWAVE_CUSTOMER_TOKEN'),
+        ],
+        'admin' => [
+            'instance_id' => env('HEYWAVE_ADMIN_INSTANCE_ID'),
+            'token' => env('HEYWAVE_ADMIN_TOKEN'),
+        ],
+    ],
 
 ];

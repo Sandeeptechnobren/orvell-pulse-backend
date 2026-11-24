@@ -5,89 +5,55 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
+/**
+ * Outbound WhatsApp via Heywave. Each line (customer / admin) is a Heywave
+ * instance addressed by instance id (URL) + instance token (request body).
+ */
 class WhatsAppService
 {
     public function sendText(
         string $chatId,
-        string $message
+        string $message,
+        string $channel = 'customer'
     ): array {
-        $token = config('services.customer_whapi.token');
+        [$instanceId, $token] = $this->instance($channel);
 
-        if (!$token) {
-            throw new RuntimeException(
-                'WHAPI_TOKEN is not configured.'
-            );
-        }
-
-        $response = Http::baseUrl(
-            config('services.whapi.base_url')
-        )
-            ->withToken($token)
+        $response = Http::baseUrl(config('services.heywave.base_url'))
             ->acceptJson()
             ->timeout(30)
-            ->post('/messages/text', [
-                'to' => $chatId,
-                'body' => $message,
+            ->post("/instance/send/{$instanceId}", [
+                'token' => $token,
+                'number' => $this->normalizeNumber($chatId),
+                'message' => $message,
             ]);
 
-        if ($response->failed()) {
-            throw new RuntimeException(
-                'WhatsApp message failed: ' .
-                $response->body()
-            );
-        }
-
-        return $response->json();
+        return $this->assertSuccess($response, 'WhatsApp message failed');
     }
+
     public function sendAdminText(
         string $chatId,
         string $message
     ): array {
-        $token = config('services.admin_whapi.token');
-
-        if (!$token) {
-            throw new RuntimeException(
-                'WHAPI_TOKEN is not configured.'
-            );
-        }
-
-        $response = Http::baseUrl(
-            config('services.whapi.base_url')
-        )
-            ->withToken($token)
-            ->acceptJson()
-            ->timeout(30)
-            ->post('/messages/text', [
-                'to' => $chatId,
-                'body' => $message,
-            ]);
-
-        if ($response->failed()) {
-            throw new RuntimeException(
-                'WhatsApp message failed: ' .
-                $response->body()
-            );
-        }
-
-        return $response->json();
+        return $this->sendText($chatId, $message, 'admin');
     }
+
+    /**
+     * Send a document (e.g. a PDF invoice) as an in-chat attachment. The file
+     * travels as base64 - it is never exposed on a public URL.
+     */
     public function sendDocument(
         string $chatId,
         string $binaryContent,
         string $filename,
         ?string $caption = null,
-        string $mimeType = 'application/pdf'
+        string $mimeType = 'application/pdf',
+        string $channel = 'customer'
     ): array {
-        $token = config('services.customer_whapi.token');
-
-        if (!$token) {
-            throw new RuntimeException(
-                'WHAPI_TOKEN is not configured.'
-            );
-        }
+        [$instanceId, $token] = $this->instance($channel);
 
         $payload = [
-            'to' => $chatId,
+            'token' => $token,
+            'number' => $this->normalizeNumber($chatId),
             'media' => 'data:' . $mimeType . ';name=' . $filename . ';base64,'
                 . base64_encode($binaryContent),
             'filename' => $filename,
@@ -97,21 +63,56 @@ class WhatsAppService
             $payload['caption'] = $caption;
         }
 
-        $response = Http::baseUrl(
-            config('services.whapi.base_url')
-        )
-            ->withToken($token)
+        $response = Http::baseUrl(config('services.heywave.base_url'))
             ->acceptJson()
             ->timeout(60)
-            ->post('/messages/document', $payload);
+            ->post("/instance/send-media/{$instanceId}", $payload);
 
-        if ($response->failed()) {
+        return $this->assertSuccess($response, 'WhatsApp document failed');
+    }
+
+    /**
+     * Resolve instance id + token for a line ('customer' or 'admin').
+     */
+    private function instance(string $channel): array
+    {
+        $instanceId = config("services.heywave.{$channel}.instance_id");
+        $token = config("services.heywave.{$channel}.token");
+
+        if (!$instanceId || !$token) {
             throw new RuntimeException(
-                'WhatsApp document failed: ' .
-                $response->body()
+                "Heywave is not configured for the {$channel} line - set HEYWAVE_" .
+                strtoupper($channel) . '_INSTANCE_ID and HEYWAVE_' .
+                strtoupper($channel) . '_TOKEN.'
             );
         }
 
-        return $response->json();
+        return [$instanceId, $token];
+    }
+
+    /**
+     * Heywave expects a bare international number (e.g. 919876543210), while
+     * stored chat ids may look like 919876543210@s.whatsapp.net.
+     */
+    private function normalizeNumber(string $chatId): string
+    {
+        $bare = str_contains($chatId, '@')
+            ? strstr($chatId, '@', true)
+            : $chatId;
+
+        return preg_replace('/[^0-9]/', '', $bare);
+    }
+
+    private function assertSuccess($response, string $errorPrefix): array
+    {
+        $json = $response->json() ?? [];
+
+        if ($response->failed() || !($json['success'] ?? false)) {
+            throw new RuntimeException(
+                $errorPrefix . ': ' . $response->body()
+            );
+        }
+
+        return $json;
     }
 }
