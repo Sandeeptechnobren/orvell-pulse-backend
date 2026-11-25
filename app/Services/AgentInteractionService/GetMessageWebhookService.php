@@ -245,16 +245,16 @@ class GetMessageWebhookService
         $skip = ['event' => ['type' => 'statuses', 'event' => 'post']];
 
         if (($payload['event'] ?? null) !== 'message') {
-            return $skip;
+            return $this->skipHeywave('event is not message', $payload, $skip);
         }
 
         if (!empty($data['isGroup'])) {
-            return $skip;
+            return $this->skipHeywave('group message', $payload, $skip);
         }
 
         $fromNumber = preg_replace('/[^0-9]/', '', (string) ($data['fromNumber'] ?? ''));
         if ($fromNumber === '') {
-            return $skip;
+            return $this->skipHeywave('no usable fromNumber (lid-only sender?)', $payload, $skip);
         }
 
         $type = (string) ($data['type'] ?? 'chat');
@@ -278,5 +278,20 @@ class GetMessageWebhookService
                 'from_name' => $data['author'] ?? null,
             ]],
         ];
+    }
+
+    /**
+     * Skipped inbound payloads were previously invisible, which made
+     * "message never arrived" and "message arrived but was dropped"
+     * indistinguishable. Log the reason and payload, then skip.
+     */
+    private function skipHeywave(string $reason, array $payload, array $skip): array
+    {
+        Log::info('Heywave payload skipped', [
+            'reason' => $reason,
+            'payload' => $payload,
+        ]);
+
+        return $skip;
     }
 }
