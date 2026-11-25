@@ -98,6 +98,14 @@ class WhatsAppService
      */
     private function normalizeNumber(string $chatId): string
     {
+        // Privacy-shielded chats are addressed by their @lid identity - the
+        // suffix must survive, Heywave needs it to route the message.
+        if (str_ends_with($chatId, '@lid')) {
+            $digits = preg_replace('/[^0-9]/', '', (string) strstr($chatId, '@', true));
+
+            return $digits . '@lid';
+        }
+
         $bare = str_contains($chatId, '@')
             ? strstr($chatId, '@', true)
             : $chatId;

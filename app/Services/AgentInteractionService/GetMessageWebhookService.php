@@ -253,8 +253,22 @@ class GetMessageWebhookService
         }
 
         $fromNumber = preg_replace('/[^0-9]/', '', (string) ($data['fromNumber'] ?? ''));
+        $chatTarget = $fromNumber;
+
         if ($fromNumber === '') {
-            return $this->skipHeywave('no usable fromNumber (lid-only sender?)', $payload, $skip);
+            // Privacy-shielded sender: WhatsApp hides their phone number and
+            // only a stable @lid identity arrives. Use the lid digits as the
+            // sender identity and keep the @lid suffix on the reply target -
+            // Heywave requires it to address the chat.
+            $lid = (string) ($data['from'] ?? '');
+            if (str_ends_with($lid, '@lid')) {
+                $fromNumber = preg_replace('/[^0-9]/', '', (string) strstr($lid, '@', true));
+                $chatTarget = $fromNumber !== '' ? $fromNumber . '@lid' : '';
+            }
+        }
+
+        if ($fromNumber === '') {
+            return $this->skipHeywave('no usable fromNumber or lid', $payload, $skip);
         }
 
         $type = (string) ($data['type'] ?? 'chat');
@@ -269,7 +283,7 @@ class GetMessageWebhookService
                     . ($data['timestamp'] ?? '') . '|' . $body
                 ),
                 'from' => $fromNumber,
-                'chat_id' => $fromNumber,
+                'chat_id' => $chatTarget,
                 'from_me' => false,
                 'type' => $type === 'chat' ? 'text' : $type,
                 'timestamp' => $data['timestamp'] ?? now()->timestamp,
